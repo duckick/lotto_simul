@@ -6,6 +6,8 @@ class LottoTicketController extends GetxController {
   final seedMoney = 1000000.obs;
   final tickets = <LottoTicket>[].obs;
 
+  final purchaseCompleted = false.obs;
+
   @override
   void onInit() {
     super.onInit();

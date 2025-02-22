@@ -24,6 +24,7 @@ class MyApp extends StatelessWidget {
         GetPage(name: '/', page: () => const StartPage()),
         GetPage(name: '/ticket', page: () => const PlayPage()),
       ],
+
       initialBinding: BindingsBuilder(() {
         Get.put(LottoTicketController());
       }),
