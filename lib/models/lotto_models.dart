@@ -55,3 +55,17 @@ class LottoRow {
     );
   }
 }
+
+class LottoResult {
+  final int round;
+  final DateTime drawDate;
+  final List<int> winningNumbers;
+  final int bonusNumber;
+
+  LottoResult({
+    required this.round,
+    required this.drawDate,
+    required this.winningNumbers,
+    required this.bonusNumber,
+  });
+}

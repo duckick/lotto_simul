@@ -18,12 +18,13 @@ class LottoTicketWidget extends StatelessWidget {
       child: Obx(() {
         final lottoTicket = controller.tickets[index];
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
           decoration: BoxDecoration(border: Border.all(color: Colors.black)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 헤더 영역
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -36,7 +37,6 @@ class LottoTicketWidget extends StatelessWidget {
               ),
               const Divider(height: 4.0, thickness: 1.0),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
@@ -44,21 +44,22 @@ class LottoTicketWidget extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 1.0),
+              const SizedBox(height: 2.0),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     '추첨일 : ${DateFormat('yyyy/MM/dd').format(lottoTicket.drawDate)}',
                   ),
                 ],
               ),
-              const Divider(height: 10.0),
+              const Divider(height: 8.0),
+              // 로또 번호 행들 (게임 당 세로 간격 최소화)
               ...lottoTicket.lottoRows
                   .map((row) => _buildLottoRow(row, controller))
                   .toList(),
               const Divider(height: 4.0),
+              // 하단 금액 및 바코드 영역
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -66,7 +67,6 @@ class LottoTicketWidget extends StatelessWidget {
                     '금액 : ₩${NumberFormat('#,###').format(lottoTicket.amount)}',
                     style: const TextStyle(fontSize: 16),
                   ),
-                  // 구매하기 버튼이 눌렸으면 바코드 위젯을 표시, 아니면 아무것도 표시하지 않음
                   controller.purchaseCompleted.value
                       ? _generateBarcode(lottoTicket)
                       : Container(),
@@ -81,48 +81,68 @@ class LottoTicketWidget extends StatelessWidget {
 
   Widget _buildLottoRow(LottoRow row, LottoTicketController controller) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 0),
+      padding: const EdgeInsets.symmetric(vertical: 2.0), // 행 사이의 간격을 최소화
       child: Row(
         children: [
           Text(row.rowName),
-          const SizedBox(width: 8.0),
+          const SizedBox(width: 4.0),
           Expanded(
-            child: Row(
-              children: row.numbers.asMap().entries.map((entry) {
-                int numIndex = entry.key;
-                int number = entry.value;
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                    child: InkWell(
-                      onTap: () {
-                        int nextNumber =
-                        (number == 0 || number >= 45) ? 1 : (number + 1);
-                        controller.updateLottoNumber(
-                          ticketIndex: index,
-                          rowName: row.rowName,
-                          index: numIndex,
-                          number: nextNumber,
-                        );
-                      },
-                      child: Container(
-                        height: 30,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          number > 0 ? number.toString().padLeft(2, '0') : '00',
+            child: SizedBox(
+              height: 32,
+              child: Row(
+                children: List.generate(
+                  6,
+                  (i) {
+                    final number = row.numbers[i];
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                        child: GestureDetector(
+                          onTap: () {
+                            // 넘버 피커 다이얼로그 표시
+                            _showNumberPickerDialog(
+                              controller,
+                              index,
+                              row.rowName,
+                              i,
+                              number,
+                            );
+                          },
+                          child: Container(
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: number > 0
+                                  ? Colors.blue.shade100
+                                  : Colors.white,
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              number > 0
+                                  ? number.toString().padLeft(2, '0')
+                                  : '00',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: number > 0
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: number > 0
+                                    ? Colors.blue.shade800
+                                    : Colors.grey,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 6.0),
+          // '자동' 버튼의 패딩과 최소 크기 조정
           ElevatedButton(
             onPressed: () => controller.generateAutoNumbers(
               ticketIndex: index,
@@ -130,15 +150,106 @@ class LottoTicketWidget extends StatelessWidget {
             ),
             style: ElevatedButton.styleFrom(
               padding:
-              const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  const EdgeInsets.symmetric(horizontal: 6.0, vertical: 5.0),
+              minimumSize: const Size(0, 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.zero,
               ),
+              textStyle: const TextStyle(fontSize: 12),
             ),
             child: const Text('자동'),
           ),
         ],
       ),
+    );
+  }
+
+  // 넘버 피커 다이얼로그를 표시하는 메소드
+  void _showNumberPickerDialog(
+    LottoTicketController controller,
+    int ticketIndex,
+    String rowName,
+    int numberIndex,
+    int currentNumber,
+  ) {
+    // 이미 사용된 번호 목록 가져오기
+    final usedNumbers = controller.tickets[ticketIndex].lottoRows
+        .firstWhere((row) => row.rowName == rowName)
+        .numbers
+        .where((num) => num > 0)
+        .toList();
+
+    // 현재 번호는 사용된 것으로 간주하지 않음
+    usedNumbers.remove(currentNumber);
+
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 1.0,
+              crossAxisSpacing: 4.0,
+              mainAxisSpacing: 4.0,
+            ),
+            itemCount: 45,
+            itemBuilder: (context, index) {
+              final number = index + 1;
+              final isSelected = number == currentNumber;
+              final isUsed = usedNumbers.contains(number);
+
+              return GestureDetector(
+                onTap: isUsed
+                    ? null
+                    : () {
+                        controller.updateLottoNumber(
+                          ticketIndex: ticketIndex,
+                          rowName: rowName,
+                          index: numberIndex,
+                          number: number,
+                        );
+                        Get.back();
+                      },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.blue
+                        : isUsed
+                            ? Colors.grey.shade300
+                            : Colors.white,
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.grey,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    number.toString().padLeft(2, '0'),
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : isUsed
+                              ? Colors.grey.shade700
+                              : Colors.black,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+      barrierDismissible: true, // 바깥쪽 탭으로 닫기 가능
     );
   }
 
@@ -149,8 +260,8 @@ class LottoTicketWidget extends StatelessWidget {
     return BarcodeWidget(
       barcode: Barcode.code93(),
       data: data,
-      width: 70, // 기존 가로 200의 반절
-      height: 26, // 기존 세로 80의 반절
+      width: 70,
+      height: 26,
       drawText: false,
     );
   }
