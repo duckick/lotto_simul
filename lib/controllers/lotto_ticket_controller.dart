@@ -97,6 +97,9 @@ class LottoTicketController extends GetxController {
       drawNumbers.clear();
       bonusNumber.value = 0;
     }
+
+    // 게임 상태 저장
+    await _saveGameState();
   }
 
   // 실제로 다음 날로 이동하는 함수 (결과 표시 후 호출됨)
@@ -137,20 +140,20 @@ class LottoTicketController extends GetxController {
 
   // 이전 날로 이동
   Future<void> moveToPreviousDay() async {
-    // 현재 날짜가 일요일인지 확인 (일요일은 weekday가 7)
+    // 현재 날짜가 일요일인지 확인
     final isCurrentlySunday = currentDate.value.weekday == 7;
 
-    // 날짜 변경 (이동 후의 날짜가 토요일인지 확인하기 위해 먼저 변경)
+    // 날짜 변경
     currentDate.value = currentDate.value.subtract(const Duration(days: 1));
 
-    // 구매 완료 상태 초기화 (더 이상 사용하지 않지만 호환성을 위해 유지)
+    // 구매 완료 상태 초기화
     purchaseCompleted.value = false;
 
     // 티켓 목록 초기화하되, 같은 수의 빈 티켓 생성
+    final currentTicketCount = tickets.length;
     tickets.clear();
 
     // 이전과 동일한 수의 티켓 생성 (최소 1장)
-    final currentTicketCount = tickets.length;
     final ticketsToCreate = currentTicketCount > 0 ? currentTicketCount : 1;
     for (int i = 0; i < ticketsToCreate; i++) {
       _addEmptyTicket();
@@ -159,17 +162,18 @@ class LottoTicketController extends GetxController {
     // 추첨일 여부 업데이트
     isDrawDay.value = isCurrentDateDrawDay();
 
-    // 일요일에서 토요일로 이동한 경우에만 결과 확인 (isCurrentlySunday가 true이면서 현재 토요일인 경우)
+    // 일요일에서 토요일로 이동할 때만 당첨 결과 확인
     if (isCurrentlySunday && isDrawDay.value) {
       await checkDrawResults();
-      // 토요일에는 결과 확인을 위해 shouldShowResult 설정
-      shouldShowResult.value = true;
     } else {
-      // 추첨일이 아니거나 일요일에서 토요일로 이동한 것이 아니면 당첨 결과 초기화
+      // 그 외의 경우에는 당첨 결과 초기화
       winningResults.clear();
       drawNumbers.clear();
       bonusNumber.value = 0;
     }
+
+    // 게임 상태 저장
+    await _saveGameState();
   }
 
   // 추첨 결과 확인
@@ -238,59 +242,103 @@ class LottoTicketController extends GetxController {
   }
 
   // 로또 구매 시도
-  Future<bool> tryPurchaseTickets() async {
-    // 이미 스낵바가 표시 중인지 확인
-    if (Get.isSnackbarOpen) {
-      return false; // 이미 스낵바가 열려있으면 구매 처리 안 함
-    }
-
-    // 총 구매금액 계산
-    final totalAmount = getTodayTotalAmount();
-
-    // 구매할 티켓이 없는 경우
-    if (totalAmount <= 0) {
-      return false;
-    }
-
-    // 보유금액 부족 체크
-    if (totalAmount > seedMoney.value) {
+  Future<void> tryPurchaseTickets() async {
+    // 이미 구매 완료된 경우
+    if (purchaseCompleted.value) {
       Get.snackbar(
-        '보유금액 부족',
-        '보유금액이 부족합니다.',
-        backgroundColor: Colors.red.shade100,
-        duration: const Duration(seconds: 1),
-        animationDuration: const Duration(milliseconds: 0),
+        '구매 완료',
+        '이미 오늘의 구매를 완료했습니다. 다음 날로 이동하세요.',
+        backgroundColor: Colors.orange.shade100,
+        duration: const Duration(seconds: 2),
         snackPosition: SnackPosition.TOP,
         margin: const EdgeInsets.all(8),
       );
-      return false;
+      return;
+    }
+
+    // 구매할 티켓이 없는 경우
+    if (tickets.isEmpty) {
+      Get.snackbar(
+        '구매 실패',
+        '구매할 티켓이 없습니다.',
+        backgroundColor: Colors.red.shade100,
+        duration: const Duration(seconds: 2),
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(8),
+      );
+      return;
+    }
+
+    // 총 구매 금액 계산
+    final totalAmount = getTodayTotalAmount();
+
+    // 구매 금액이 0인 경우
+    if (totalAmount <= 0) {
+      Get.snackbar(
+        '구매 실패',
+        '구매할 티켓이 없습니다.',
+        backgroundColor: Colors.red.shade100,
+        duration: const Duration(seconds: 2),
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(8),
+      );
+      return;
+    }
+
+    // 잔액 부족
+    if (totalAmount > seedMoney.value) {
+      Get.snackbar(
+        '잔액 부족',
+        '보유 금액이 부족합니다.',
+        backgroundColor: Colors.red.shade100,
+        duration: const Duration(seconds: 2),
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(8),
+      );
+      return;
     }
 
     // 구매 처리
     seedMoney.value -= totalAmount;
-    totalSpent.value += totalAmount; // 총 구매 금액 업데이트
-    purchaseCompleted.value = true; // 더 이상 사용하지 않지만 호환성을 위해 유지
+    totalSpent.value += totalAmount;
 
-    // 구매한 티켓을 데이터베이스에 저장
-    for (var ticket in tickets) {
-      if (ticket.amount > 0) {
-        // 금액이 있는 티켓만 저장 (선택된 번호가 있는 티켓)
-        await _dbService.savePurchasedTicket(currentDate.value, ticket);
-      }
+    // 구매 완료 상태로 변경
+    purchaseCompleted.value = true;
+
+    // 구매한 티켓 저장
+    await _savePurchasedTickets();
+
+    // 토요일에 구매한 경우 moveToNextDay 호출 (결과 확인 포함)
+    if (isDrawDay.value) {
+      await moveToNextDay();
+    } else {
+      // 토요일이 아닌 경우 바로 다음 날로 이동
+      await moveToNextDay();
     }
 
-    // 스낵바를 제거하고 애니메이션을 위젯에서 처리
+    // 게임 상태 저장
+    await _saveGameState();
+  }
 
-    // 토요일인 경우에도 넘어가기 버튼과 동일하게 처리 (moveToNextDay 호출)
-    // moveToNextDay 메서드 내에서 토요일인 경우 결과 다이얼로그를 표시함
-    await moveToNextDay();
-
-    return true;
+  // 이번 주 구매한 티켓 수 조회
+  Future<int> getWeeklyTicketCount() async {
+    try {
+      // 이번 주 토요일(추첨일)에 해당하는 모든 티켓 조회
+      final tickets =
+          await _dbService.getAllTicketsForDrawDate(currentDate.value);
+      return tickets.length;
+    } catch (e) {
+      print('주간 티켓 수 조회 오류: $e');
+      return 0;
+    }
   }
 
   // 지연 후 결과 다이얼로그를 표시하는 함수
   void _showResultDialogAfterDelay() {
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 300), () async {
+      // 이번 주 구매한 티켓 수 조회
+      final weeklyTicketCount = await getWeeklyTicketCount();
+
       // 당첨 결과를 등수별로 그룹화
       final Map<int, List<Map<String, dynamic>>> groupedResults = {};
 
@@ -398,6 +446,20 @@ class LottoTicketController extends GetxController {
                         ),
                       );
                     }).toList(),
+
+                  // 이번 주 구매한 티켓 수 표시
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.center,
+                    child: Text(
+                      '이번 주 구매한 로또: ${weeklyTicketCount}장',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        // fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -464,21 +526,89 @@ class LottoTicketController extends GetxController {
   @override
   void onInit() async {
     super.onInit();
-    // 초기 티켓 생성
-    addNewTicket();
 
-    // 추첨일 여부 초기화
-    isDrawDay.value = isCurrentDateDrawDay();
+    // 저장된 게임 상태가 있는지 확인하고 로드
+    final hasState = await _dbService.hasGameState();
+    if (hasState) {
+      await _loadGameState();
+    } else {
+      // 초기 티켓 생성
+      addNewTicket();
 
-    // 추첨일이면 추첨 결과 확인 (구매 여부와 관계없이)
-    if (isDrawDay.value) {
-      await checkDrawResults();
-      // 토요일에는 결과 확인을 위해 구매 완료 상태로 자동 설정하지 않음
-      // purchaseCompleted.value = true;
+      // 추첨일 여부 초기화
+      isDrawDay.value = isCurrentDateDrawDay();
+
+      // 추첨일이면 추첨 결과 확인 (구매 여부와 관계없이)
+      if (isDrawDay.value) {
+        await checkDrawResults();
+      }
+
+      // 초기 상태 저장
+      await _saveGameState();
     }
 
     // 이전 당첨 결과 로드
     await loadAllWinningResults();
+
+    // 게임 상태 변경 시 저장하도록 리스너 설정
+    ever(currentDate, (_) => _saveGameState());
+    ever(seedMoney, (_) => _saveGameState());
+    ever(tickets, (_) => _saveGameState());
+    ever(isDrawDay, (_) => _saveGameState());
+    ever(drawNumbers, (_) => _saveGameState());
+    ever(bonusNumber, (_) => _saveGameState());
+    ever(totalSpent, (_) => _saveGameState());
+  }
+
+  // 게임 상태 저장
+  Future<void> _saveGameState() async {
+    try {
+      await _dbService.saveGameState(
+        currentDate: currentDate.value,
+        seedMoney: seedMoney.value,
+        tickets: tickets.toList(),
+        isDrawDay: isDrawDay.value,
+        drawNumbers: drawNumbers.toList(),
+        bonusNumber: bonusNumber.value,
+        totalSpent: totalSpent.value,
+      );
+    } catch (e) {
+      print('게임 상태 저장 오류: $e');
+    }
+  }
+
+  // 게임 상태 로드
+  Future<void> _loadGameState() async {
+    try {
+      final state = await _dbService.loadGameState();
+      if (state != null) {
+        currentDate.value = state['current_date'] as DateTime;
+        seedMoney.value = state['seed_money'] as int;
+        tickets.assignAll(state['tickets'] as List<LottoTicket>);
+        isDrawDay.value = state['is_draw_day'] as bool;
+        drawNumbers.assignAll(state['draw_numbers'] as List<int>);
+        bonusNumber.value = state['bonus_number'] as int;
+        totalSpent.value = state['total_spent'] as int;
+
+        print('게임 상태를 성공적으로 로드했습니다.');
+      }
+    } catch (e) {
+      print('게임 상태 로드 오류: $e');
+    }
+  }
+
+  // 구매한 티켓 저장
+  Future<void> _savePurchasedTickets() async {
+    try {
+      for (var ticket in tickets) {
+        if (ticket.amount > 0) {
+          // 금액이 있는 티켓만 저장 (선택된 번호가 있는 티켓)
+          await _dbService.savePurchasedTicket(currentDate.value, ticket);
+        }
+      }
+    } catch (e) {
+      print('티켓 저장 오류: $e');
+    }
   }
 
   // 모든 당첨 결과 로드

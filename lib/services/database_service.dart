@@ -23,6 +23,10 @@ class DatabaseService {
       path,
       version: 1,
       onCreate: _createDatabase,
+      onOpen: (db) async {
+        // 데이터베이스가 열릴 때 게임 상태 테이블이 있는지 확인하고 없으면 생성
+        await _ensureGameStateTableExists(db);
+      },
     );
   }
 
@@ -46,6 +50,65 @@ class DatabaseService {
         bonus_number INTEGER
       )
     ''');
+
+    // 게임 상태 테이블
+    await db.execute('''
+      CREATE TABLE game_state(
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        current_date TEXT,
+        seed_money INTEGER,
+        tickets TEXT,
+        is_draw_day INTEGER,
+        draw_numbers TEXT,
+        bonus_number INTEGER,
+        total_spent INTEGER,
+        last_updated TEXT
+      )
+    ''');
+  }
+
+  // 게임 상태 테이블이 있는지 확인하고 없으면 생성
+  Future<void> _ensureGameStateTableExists(Database db) async {
+    try {
+      // 테이블이 있는지 확인
+      final tables = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='game_state'");
+
+      if (tables.isEmpty) {
+        print('게임 상태 테이블이 없습니다. 새로 생성합니다.');
+        // 게임 상태 테이블 생성
+        await db.execute('''
+          CREATE TABLE game_state(
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            current_date TEXT,
+            seed_money INTEGER,
+            tickets TEXT,
+            is_draw_day INTEGER,
+            draw_numbers TEXT,
+            bonus_number INTEGER,
+            total_spent INTEGER,
+            last_updated TEXT
+          )
+        ''');
+        print('게임 상태 테이블이 생성되었습니다.');
+      } else {
+        // 테이블이 있지만 total_spent 컬럼이 없는지 확인
+        final columns = await db.rawQuery("PRAGMA table_info(game_state)");
+        final hasTotalSpent =
+            columns.any((column) => column['name'] == 'total_spent');
+
+        if (!hasTotalSpent) {
+          print('게임 상태 테이블에 total_spent 컬럼이 없습니다. 추가합니다.');
+          await db.execute(
+              'ALTER TABLE game_state ADD COLUMN total_spent INTEGER DEFAULT 0');
+          print('total_spent 컬럼이 추가되었습니다.');
+        }
+
+        print('게임 상태 테이블이 이미 존재합니다.');
+      }
+    } catch (e) {
+      print('게임 상태 테이블 확인/생성 오류: $e');
+    }
   }
 
   // 로또 티켓 저장
@@ -238,11 +301,132 @@ class DatabaseService {
       // 모든 테이블의 데이터 삭제
       await db.delete('purchased_tickets');
       await db.delete('draw_results');
+      await db.delete('game_state');
 
       print('모든 데이터가 초기화되었습니다.');
     } catch (e) {
       print('데이터 초기화 오류: $e');
       throw e; // 오류를 상위로 전파하여 UI에서 처리할 수 있도록 함
+    }
+  }
+
+  // 게임 상태 저장
+  Future<void> saveGameState({
+    required DateTime currentDate,
+    required int seedMoney,
+    required List<LottoTicket> tickets,
+    required bool isDrawDay,
+    required List<int> drawNumbers,
+    required int bonusNumber,
+    required int totalSpent,
+  }) async {
+    final db = await database;
+
+    // 티켓 데이터를 JSON으로 변환
+    final ticketsJson = tickets.map((ticket) => ticket.toJson()).toList();
+
+    final gameState = {
+      'id': 1, // 항상 단일 레코드만 유지
+      'current_date': currentDate.toIso8601String(),
+      'seed_money': seedMoney,
+      'tickets': jsonEncode(ticketsJson),
+      'is_draw_day': isDrawDay ? 1 : 0,
+      'draw_numbers': jsonEncode(drawNumbers),
+      'bonus_number': bonusNumber,
+      'total_spent': totalSpent,
+      'last_updated': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      // 기존 레코드가 있는지 확인
+      final count = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM game_state WHERE id = 1'));
+
+      if (count != null && count > 0) {
+        // 기존 레코드 업데이트
+        await db.update(
+          'game_state',
+          gameState,
+          where: 'id = 1',
+        );
+      } else {
+        // 새 레코드 삽입
+        await db.insert('game_state', gameState);
+      }
+
+      print('게임 상태가 성공적으로 저장되었습니다.');
+    } catch (e) {
+      print('게임 상태 저장 오류: $e');
+      throw e;
+    }
+  }
+
+  // 게임 상태 로드
+  Future<Map<String, dynamic>?> loadGameState() async {
+    try {
+      final db = await database;
+      final List<Map<String, dynamic>> result = await db.query(
+        'game_state',
+        where: 'id = 1',
+      );
+
+      if (result.isNotEmpty) {
+        final data = result.first;
+
+        // 티켓 데이터 파싱
+        final ticketsJson = jsonDecode(data['tickets'] as String) as List;
+        final tickets =
+            ticketsJson.map((json) => LottoTicket.fromJson(json)).toList();
+
+        // 추첨 번호 파싱
+        final drawNumbersJson =
+            jsonDecode(data['draw_numbers'] as String) as List;
+        final drawNumbers = drawNumbersJson.map((num) => num as int).toList();
+
+        // total_spent 필드가 없는 경우 기본값 0 사용
+        final totalSpent = data['total_spent'] ?? 0;
+
+        return {
+          'current_date': DateTime.parse(data['current_date'] as String),
+          'seed_money': data['seed_money'] as int,
+          'tickets': tickets,
+          'is_draw_day': data['is_draw_day'] == 1,
+          'draw_numbers': drawNumbers,
+          'bonus_number': data['bonus_number'] as int,
+          'total_spent': totalSpent,
+          'last_updated': DateTime.parse(data['last_updated'] as String),
+        };
+      }
+
+      return null; // 저장된 상태가 없음
+    } catch (e) {
+      print('게임 상태 로드 오류: $e');
+      return null;
+    }
+  }
+
+  // 게임 상태 존재 여부 확인
+  Future<bool> hasGameState() async {
+    try {
+      final db = await database;
+      final count = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM game_state WHERE id = 1'));
+      return count != null && count > 0;
+    } catch (e) {
+      print('게임 상태 확인 오류: $e');
+      return false;
+    }
+  }
+
+  // 게임 상태 초기화
+  Future<void> resetGameState() async {
+    try {
+      final db = await database;
+      await db.delete('game_state');
+      print('게임 상태가 초기화되었습니다.');
+    } catch (e) {
+      print('게임 상태 초기화 오류: $e');
+      throw e;
     }
   }
 }
