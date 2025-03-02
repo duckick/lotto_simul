@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../controllers/lotto_ticket_controller.dart';
+import '../services/database_service.dart';
 
 class StartPage extends StatelessWidget {
   const StartPage({Key? key}) : super(key: key);
@@ -8,38 +10,165 @@ class StartPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GestureDetector(
-        onTap: () => Get.toNamed('/ticket'),
-        child: Stack(
-          children: [
-            const LottoBallsAnimation(),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'LOTTO',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+      body: Stack(
+        children: [
+          const LottoBallsAnimation(),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'LOTTO',
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                InkWell(
+                  onTap: () => Get.offAllNamed('/main'),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 48),
+                    decoration: BoxDecoration(
+                      // color: Colors.blue.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Tap to Start',
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: Colors.grey[800],
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Tap to Start',
-                    style: TextStyle(
-                      fontSize: 24,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 20,
+            bottom: 20,
+            child: IconButton(
+              icon: const Icon(
+                Icons.settings,
+                size: 30,
+                color: Colors.blue,
+              ),
+              onPressed: () => _showSettingsDialog(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            '설정',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.refresh, color: Colors.red),
+                title: const Text('모든 데이터 초기화'),
+                subtitle: const Text('모든 데이터가 삭제되고 처음부터 다시 시작합니다.'),
+                onTap: () => _showResetConfirmationDialog(context),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('닫기'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showResetConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('데이터 초기화'),
+          content: const Text(
+            '정말로 모든 데이터를 초기화하시겠습니까?\n\n모든 구매 내역, 당첨 결과, 통계 데이터가 영구적으로 삭제됩니다.',
+            style: TextStyle(
+              color: Colors.red,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await _resetAllData();
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+                Get.snackbar(
+                  '초기화 완료',
+                  '모든 데이터가 초기화되었습니다.',
+                  backgroundColor: Colors.green.shade100,
+                  duration: const Duration(seconds: 2),
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              },
+              child: const Text(
+                '초기화',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  Future<void> _resetAllData() async {
+    try {
+      await DatabaseService.instance.resetAllData();
+
+      final controller = Get.find<LottoTicketController>();
+      controller.seedMoney.value = 1000000;
+      controller.totalSpent.value = 0;
+      controller.winningResults.clear();
+      controller.allWinningResults.clear();
+      controller.drawNumbers.clear();
+      controller.bonusNumber.value = 0;
+
+      controller.currentDate.value = DateTime.now();
+
+      controller.tickets.clear();
+      controller.addNewTicket();
+
+      controller.isDrawDay.value = controller.isCurrentDateDrawDay();
+    } catch (e) {
+      print('데이터 초기화 오류: $e');
+      Get.snackbar(
+        '오류',
+        '데이터 초기화 중 오류가 발생했습니다: $e',
+        backgroundColor: Colors.red.shade100,
+        duration: const Duration(seconds: 3),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 }
 
