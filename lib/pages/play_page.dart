@@ -179,114 +179,6 @@ class _PlayPageState extends State<PlayPage> {
     return weekdays[date.weekday - 1];
   }
 
-  // 당첨 결과 다이얼로그 표시
-  void _showResultDialog(
-      BuildContext context, LottoTicketController controller) {
-    final drawNumbers = controller.drawNumbers;
-    final bonusNumber = controller.bonusNumber.value;
-    final winningResults = controller.winningResults;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title:
-            const Text('당첨 결과', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Container(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 추첨 번호 표시
-                const Text('이번 회차 당첨 번호',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ...drawNumbers
-                        .map((number) => _buildLottoBall(number, false)),
-                    const Text(' + ', style: TextStyle(fontSize: 16)),
-                    _buildLottoBall(bonusNumber, true),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-
-                // 당첨 결과 표시
-                if (winningResults.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(child: Text('당첨된 번호가 없습니다.')),
-                  )
-                else
-                  ...winningResults.map((result) {
-                    final rank = result['rank'] as int;
-                    final prize = result['prize'] as int;
-                    final numbers = List<int>.from(result['numbers']);
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _getRankColor(rank),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '$rank등',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '₩${NumberFormat('#,###').format(prize)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: numbers
-                                .map((num) =>
-                                    _buildLottoBall(num, false, size: 24))
-                                .toList(),
-                          ),
-                          const Divider(),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // 결과 확인 후 다음 날로 이동
-              controller.actuallyMoveToNextDay();
-            },
-            child: const Text('다음 날로 이동'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // 로또 볼 위젯
   Widget _buildLottoBall(int number, bool isBonus, {double size = 32}) {
     Color ballColor;
@@ -355,16 +247,6 @@ class _PlayPageState extends State<PlayPage> {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<LottoTicketController>();
-
-    // shouldShowResult 변수를 감시하여 결과 팝업 표시
-    ever(controller.shouldShowResult, (shouldShow) {
-      if (shouldShow) {
-        // 약간의 지연 후 결과 다이얼로그 표시 (다른 작업이 완료되도록)
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _showResultDialog(context, controller);
-        });
-      }
-    });
 
     return WillPopScope(
       onWillPop: () async {
@@ -638,7 +520,19 @@ class _PlayPageState extends State<PlayPage> {
                                   // 성공 여부는 tryPurchaseTickets 메소드 내에서 처리함
                                 } else {
                                   // 총 구매금액이 0일 때는 다음 날로 넘어가기
-                                  controller.moveToNextDay();
+                                  // 토요일(추첨일)인지와 이미 다이얼로그가 표시 중인지 확인
+                                  final isDrawDay = controller.isDrawDay.value;
+                                  final isDialogAlreadyShown =
+                                      controller.shouldShowResult.value;
+
+                                  if (isDrawDay && isDialogAlreadyShown) {
+                                    // 이미 다이얼로그가 표시 중이라면 다음 날로 직접 이동
+                                    controller.actuallyMoveToNextDay();
+                                  } else {
+                                    // 그 외의 경우는 일반적인 다음 날로 이동
+                                    controller.moveToNextDay();
+                                  }
+
                                   Get.snackbar(
                                     '다음 날로 이동',
                                     '다음 날로 이동했습니다.',

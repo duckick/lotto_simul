@@ -58,12 +58,28 @@ class LottoTicketController extends GetxController {
     // 현재 날짜가 토요일인지 확인
     final isCurrentlySaturday = isCurrentDateDrawDay();
 
-    // 토요일이면 추첨 결과를 확인하고 결과 다이얼로그 표시
-    if (isCurrentlySaturday) {
+    // 이미 다이얼로그가 표시 중인지 확인
+    final isDialogOpen = Get.isDialogOpen ?? false;
+
+    // 디버깅 로그 추가
+    print(
+        'moveToNextDay 호출: 토요일=$isCurrentlySaturday, shouldShowResult=${shouldShowResult.value}, isDialogOpen=$isDialogOpen');
+
+    // 토요일이면 추첨 결과를 확인하고 결과 다이얼로그 표시 (중복 방지 로직 추가)
+    if (isCurrentlySaturday && !shouldShowResult.value && !isDialogOpen) {
       await checkDrawResults();
+      // 결과 다이얼로그 표시 상태로 설정
+      shouldShowResult.value = true;
       // 직접 다이얼로그를 표시하도록 함수 호출
       _showResultDialogAfterDelay();
       return; // 여기서 리턴하여 _showResultDialogAfterDelay 내에서 다음 날로 이동하도록 함
+    } else if (isCurrentlySaturday &&
+        (shouldShowResult.value || isDialogOpen)) {
+      // 이미 결과 다이얼로그를 표시 중인 경우는 다이얼로그 표시 없이 다음 날로 진행
+      shouldShowResult.value = false;
+      // 바로 다음 날로 이동
+      await actuallyMoveToNextDay();
+      return;
     }
 
     // 토요일이 아니면 결과 팝업 표시 신호 초기화
@@ -90,7 +106,7 @@ class LottoTicketController extends GetxController {
     // 추첨일 여부 업데이트
     isDrawDay.value = isCurrentDateDrawDay();
 
-    // 추첨일이 되었을 때만 초기화 (금요일에서 토요일로 넘어갈 때는 당첨 결과를 확인하지 않음)
+    // 추첨일이 되었을 때만 초기화
     if (!isDrawDay.value) {
       // 추첨일이 아니면 당첨 결과 초기화
       winningResults.clear();
@@ -127,15 +143,19 @@ class LottoTicketController extends GetxController {
     // 추첨일 여부 업데이트
     isDrawDay.value = isCurrentDateDrawDay();
 
-    // 추첨일이면 추첨 결과 확인
+    // 추첨일인 경우 추첨 결과 확인 (다이얼로그는 표시하지 않음)
     if (isDrawDay.value) {
       await checkDrawResults();
+      // 여기서는 다이얼로그를 표시하지 않음 - 중복 방지
     } else {
       // 추첨일이 아니면 당첨 결과 초기화
       winningResults.clear();
       drawNumbers.clear();
       bonusNumber.value = 0;
     }
+
+    // 게임 상태 저장
+    await _saveGameState();
   }
 
   // 이전 날로 이동
@@ -310,9 +330,16 @@ class LottoTicketController extends GetxController {
 
     // 토요일에 구매한 경우
     if (isDrawDay.value) {
+      // 이미 다이얼로그가 표시 중인지 확인 (중복 방지)
+      if (Get.isDialogOpen ?? false) {
+        return;
+      }
+
       // 토요일인 경우 checkDrawResults()만 호출하고
       // moveToNextDay()는 호출하지 않음 (중복 다이얼로그 방지)
       await checkDrawResults();
+      // 결과 다이얼로그 표시 상태로 설정
+      shouldShowResult.value = true;
       _showResultDialogAfterDelay(); // 다이얼로그는 표시
     } else {
       // 토요일이 아닌 경우 바로 다음 날로 이동
@@ -349,6 +376,11 @@ class LottoTicketController extends GetxController {
   // 지연 후 결과 다이얼로그를 표시하는 함수
   void _showResultDialogAfterDelay() {
     Future.delayed(const Duration(milliseconds: 300), () async {
+      // Get.isDialogOpen을 확인하여 이미 다이얼로그가 열려있는 경우 중복 표시 방지
+      if (Get.isDialogOpen ?? false) {
+        return;
+      }
+
       // 이번 회차 구매한 티켓 수 조회
       final ticketCount = await getCurrentRoundTicketCount();
 
