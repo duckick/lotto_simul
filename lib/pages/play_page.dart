@@ -291,6 +291,9 @@ class _PlayPageState extends State<PlayPage> {
                               icon: const Icon(Icons.bar_chart),
                               tooltip: '당첨 통계',
                               onPressed: () => controller.goToStatsPage(),
+                              style: IconButton.styleFrom(
+                                highlightColor: Colors.transparent,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             // 보유금액
@@ -322,6 +325,15 @@ class _PlayPageState extends State<PlayPage> {
                               height: 65, // 56 + 9 = 65픽셀로 높이 증가
                               child: Card(
                                 margin: EdgeInsets.zero,
+                                elevation: 0, // 그림자 제거
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(4), // 각진 모서리
+                                  side: BorderSide(
+                                    color: Colors.blue.shade100,
+                                    width: 1,
+                                  ),
+                                ),
                                 color: Colors.blue.shade50,
                                 child: Padding(
                                   padding: const EdgeInsets.all(12.0),
@@ -351,44 +363,60 @@ class _PlayPageState extends State<PlayPage> {
                           child: Obx(() {
                             return Container(
                               height: 65, // 56 + 9 = 65픽셀로 높이 증가
-                              child: InkWell(
-                                onTap: () {
-                                  controller.addNewTicket();
-                                },
-                                child: Card(
-                                  margin: EdgeInsets.zero,
-                                  color: Colors.green.shade50,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12.0, vertical: 8.0),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text('총 티켓수',
-                                                style: TextStyle(fontSize: 12)),
-                                            Text(
-                                              '${controller.tickets.length}장',
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    controller.addNewTicket();
+                                  },
+                                  borderRadius: BorderRadius.circular(4),
+                                  splashColor: Colors.transparent,
+                                  highlightColor: Colors.transparent,
+                                  child: Card(
+                                    margin: EdgeInsets.zero,
+                                    elevation: 0, // 그림자 제거
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(4), // 각진 모서리
+                                      side: BorderSide(
+                                        color: Colors.green.shade100,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    color: Colors.green.shade50,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12.0, vertical: 8.0),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text('총 티켓수',
+                                                  style:
+                                                      TextStyle(fontSize: 12)),
+                                              Text(
+                                                '${controller.tickets.length}장',
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                        // 로또 추가 아이콘 표시
-                                        Icon(
-                                          Icons.add_circle,
-                                          color: Colors.green.shade700,
-                                          size: 28,
-                                        ),
-                                      ],
+                                            ],
+                                          ),
+                                          // 로또 추가 아이콘 표시
+                                          Icon(
+                                            Icons.add_circle,
+                                            color: Colors.green.shade700,
+                                            size: 28,
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -432,15 +460,9 @@ class _PlayPageState extends State<PlayPage> {
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, -2),
-                        ),
-                      ],
+                      // 그림자 제거
                     ),
                     child: Row(
                       children: [
@@ -467,18 +489,17 @@ class _PlayPageState extends State<PlayPage> {
                                   }
                                 }
                               }
-                              // Get.snackbar(
-                              //   '일괄 자동',
-                              //   '일괄 자동이 적용되었습니다.',
-                              //   backgroundColor: Colors.green.shade100,
-                              //   duration: const Duration(seconds: 1),
-                              //   animationDuration: const Duration(milliseconds: 0),
-                              //   snackPosition: SnackPosition.TOP,
-                              //   margin: const EdgeInsets.all(8),
-                              // );
                             },
                             icon: const Icon(Icons.flash_on),
                             label: const Text('일괄 자동'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.black87,
+                              side: const BorderSide(color: Colors.black26),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -537,6 +558,7 @@ class _PlayPageState extends State<PlayPage> {
                                     '다음 날로 이동',
                                     '다음 날로 이동했습니다.',
                                     backgroundColor: Colors.blue.shade100,
+                                    borderRadius: 4, // 각진 모서리
                                     duration: const Duration(milliseconds: 300),
                                     animationDuration:
                                         const Duration(milliseconds: 0),
@@ -552,6 +574,14 @@ class _PlayPageState extends State<PlayPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
                                     canPurchase ? Colors.blue : Colors.amber,
+                                foregroundColor: Colors.white,
+                                elevation: 0, // 그림자 제거
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(4), // 각진 모서리
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                               ),
                             );
                           }),
