@@ -308,9 +308,12 @@ class LottoTicketController extends GetxController {
     // 구매한 티켓 저장
     await _savePurchasedTickets();
 
-    // 토요일에 구매한 경우 moveToNextDay 호출 (결과 확인 포함)
+    // 토요일에 구매한 경우
     if (isDrawDay.value) {
-      await moveToNextDay();
+      // 토요일인 경우 checkDrawResults()만 호출하고
+      // moveToNextDay()는 호출하지 않음 (중복 다이얼로그 방지)
+      await checkDrawResults();
+      _showResultDialogAfterDelay(); // 다이얼로그는 표시
     } else {
       // 토요일이 아닌 경우 바로 다음 날로 이동
       await moveToNextDay();
@@ -320,15 +323,25 @@ class LottoTicketController extends GetxController {
     await _saveGameState();
   }
 
-  // 이번 주 구매한 티켓 수 조회
-  Future<int> getWeeklyTicketCount() async {
+  // 이번 회차 구매한 티켓 수 조회 (일요일부터 토요일까지)
+  Future<int> getCurrentRoundTicketCount() async {
     try {
-      // 이번 주 토요일(추첨일)에 해당하는 모든 티켓 조회
-      final tickets =
-          await _dbService.getAllTicketsForDrawDate(currentDate.value);
-      return tickets.length;
+      // 이번 회차 추첨일(토요일)
+      final drawDate = currentDate.value;
+      // 이번 회차 시작일(이전 일요일)
+      final startDate = DateTime(
+          drawDate.year, drawDate.month, drawDate.day - 6 // 일요일은 토요일로부터 6일 전
+          );
+
+      // 이번 회차에 해당하는 모든 티켓 조회 (일요일~토요일)
+      final tickets = await _dbService.getAllTicketsForDrawDate(drawDate);
+
+      // 이전 주 일요일에 구매한 티켓도 조회 (이번 회차에 포함)
+      final sundayTickets = await _dbService.getTicketsOnDate(startDate);
+
+      return tickets.length + sundayTickets.length;
     } catch (e) {
-      print('주간 티켓 수 조회 오류: $e');
+      print('회차 티켓 수 조회 오류: $e');
       return 0;
     }
   }
@@ -336,8 +349,8 @@ class LottoTicketController extends GetxController {
   // 지연 후 결과 다이얼로그를 표시하는 함수
   void _showResultDialogAfterDelay() {
     Future.delayed(const Duration(milliseconds: 300), () async {
-      // 이번 주 구매한 티켓 수 조회
-      final weeklyTicketCount = await getWeeklyTicketCount();
+      // 이번 회차 구매한 티켓 수 조회
+      final ticketCount = await getCurrentRoundTicketCount();
 
       // 당첨 결과를 등수별로 그룹화
       final Map<int, List<Map<String, dynamic>>> groupedResults = {};
@@ -447,16 +460,16 @@ class LottoTicketController extends GetxController {
                       );
                     }).toList(),
 
-                  // 이번 주 구매한 티켓 수 표시
+                  // 이번 회차 구매한 티켓 수 표시
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.center,
                     child: Text(
-                      '이번 주 구매한 로또: ${weeklyTicketCount}장',
+                      '이번 회차 구매한 로또: ${ticketCount}장',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
-                        // fontStyle: FontStyle.italic,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),

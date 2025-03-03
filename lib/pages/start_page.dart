@@ -12,7 +12,7 @@ class StartPage extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          const LottoBallsAnimation(),
+          // const LottoBallsAnimation(), // 공 애니메이션 주석 처리
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -31,7 +31,7 @@ class StartPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 12, horizontal: 48),
+                        vertical: 30, horizontal: 80),
                     decoration: BoxDecoration(
                       // color: Colors.blue.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),

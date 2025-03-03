@@ -173,6 +173,23 @@ class DatabaseService {
     });
   }
 
+  // 특정 날짜에 구매한 모든 티켓 맵 조회
+  Future<List<Map<String, dynamic>>> getTicketsOnDate(DateTime date) async {
+    final db = await database;
+
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+    // 특정 날짜에 구매한 티켓 조회
+    final List<Map<String, dynamic>> maps = await db.query(
+      'purchased_tickets',
+      where: 'purchase_date BETWEEN ? AND ?',
+      whereArgs: [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
+    );
+
+    return maps;
+  }
+
   // 추첨 결과 저장
   Future<int> saveDrawResult(
       DateTime drawDate, List<int> numbers, int bonusNumber) async {

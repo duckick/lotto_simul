@@ -366,305 +366,313 @@ class _PlayPageState extends State<PlayPage> {
       }
     });
 
-    return Stack(
-      children: [
-        Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.blue.shade200,
+    return WillPopScope(
+      onWillPop: () async {
+        // 뒤로가기 버튼을 누르면 StartPage로 이동
+        Get.offAllNamed('/');
+        return false; // 기본 뒤로가기 동작 방지
+      },
+      child: Stack(
+        children: [
+          Scaffold(
+            body: SafeArea(
+              child: Column(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.blue.shade200,
+                        ),
                       ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Obx(() {
-                        final date = controller.currentDate.value;
-                        return Text(
-                          '${DateFormat('yyyy년 MM월 dd일').format(date)} (${_getKoreanWeekday(date)})',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      }),
-                      Row(
-                        children: [
-                          // 통계 버튼
-                          IconButton(
-                            icon: const Icon(Icons.bar_chart),
-                            tooltip: '당첨 통계',
-                            onPressed: () => controller.goToStatsPage(),
-                          ),
-                          const SizedBox(width: 8),
-                          // 보유금액
-                          Obx(() => Text(
-                                '₩${NumberFormat('#,###').format(controller.seedMoney.value)}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
-                                ),
-                              )),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 상단 요약 정보
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Obx(() {
-                          final totalAmount = controller.tickets
-                              .fold(0, (sum, ticket) => sum + ticket.amount);
-                          return Container(
-                            height: 65, // 56 + 9 = 65픽셀로 높이 증가
-                            child: Card(
-                              margin: EdgeInsets.zero,
-                              color: Colors.blue.shade50,
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('총 구매금액',
-                                        style: TextStyle(fontSize: 12)),
-                                    Text(
-                                      '₩${NumberFormat('#,###').format(totalAmount)}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Obx(() {
+                          final date = controller.currentDate.value;
+                          return Text(
+                            '${DateFormat('yyyy년 MM월 dd일').format(date)} (${_getKoreanWeekday(date)})',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           );
                         }),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Obx(() {
-                          return Container(
-                            height: 65, // 56 + 9 = 65픽셀로 높이 증가
-                            child: InkWell(
-                              onTap: () {
-                                controller.addNewTicket();
-                              },
+                        Row(
+                          children: [
+                            // 통계 버튼
+                            IconButton(
+                              icon: const Icon(Icons.bar_chart),
+                              tooltip: '당첨 통계',
+                              onPressed: () => controller.goToStatsPage(),
+                            ),
+                            const SizedBox(width: 8),
+                            // 보유금액
+                            Obx(() => Text(
+                                  '₩${NumberFormat('#,###').format(controller.seedMoney.value)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                )),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 상단 요약 정보
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Obx(() {
+                            final totalAmount = controller.tickets
+                                .fold(0, (sum, ticket) => sum + ticket.amount);
+                            return Container(
+                              height: 65, // 56 + 9 = 65픽셀로 높이 증가
                               child: Card(
                                 margin: EdgeInsets.zero,
-                                color: Colors.green.shade50,
+                                color: Colors.blue.shade50,
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12.0, vertical: 8.0),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('총 티켓수',
-                                              style: TextStyle(fontSize: 12)),
-                                          Text(
-                                            '${controller.tickets.length}장',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      // 로또 추가 아이콘 표시
-                                      Icon(
-                                        Icons.add_circle,
-                                        color: Colors.green.shade700,
-                                        size: 28,
+                                      const Text('총 구매금액',
+                                          style: TextStyle(fontSize: 12)),
+                                      Text(
+                                        '₩${NumberFormat('#,###').format(totalAmount)}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                            ),
+                            );
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Obx(() {
+                            return Container(
+                              height: 65, // 56 + 9 = 65픽셀로 높이 증가
+                              child: InkWell(
+                                onTap: () {
+                                  controller.addNewTicket();
+                                },
+                                child: Card(
+                                  margin: EdgeInsets.zero,
+                                  color: Colors.green.shade50,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12.0, vertical: 8.0),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text('총 티켓수',
+                                                style: TextStyle(fontSize: 12)),
+                                            Text(
+                                              '${controller.tickets.length}장',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        // 로또 추가 아이콘 표시
+                                        Icon(
+                                          Icons.add_circle,
+                                          color: Colors.green.shade700,
+                                          size: 28,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 미니 로또 티켓 그리드
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Obx(() {
+                        if (controller.tickets.isEmpty) {
+                          return const Center(
+                            child: Text('로또 티켓이 없습니다. + 버튼을 눌러 티켓을 추가하세요.'),
                           );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
+                        }
 
-                // 미니 로또 티켓 그리드
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Obx(() {
-                      if (controller.tickets.isEmpty) {
-                        return const Center(
-                          child: Text('로또 티켓이 없습니다. + 버튼을 눌러 티켓을 추가하세요.'),
-                        );
-                      }
-
-                      return GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 1.8,
-                          crossAxisSpacing: 6,
-                          mainAxisSpacing: 6,
-                        ),
-                        itemCount: controller.tickets.length,
-                        itemBuilder: (context, index) {
-                          return MiniLottoTicketWidget(index: index);
-                        },
-                      );
-                    }),
-                  ),
-                ),
-
-                // 하단 버튼 영역
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            // 이미 스낵바가 표시 중인지 확인
-                            if (Get.isSnackbarOpen) {
-                              return; // 이미 스낵바가 열려있으면 추가 스낵바를 표시하지 않음
-                            }
-
-                            // 다이얼로그 없이 바로 모든 티켓의 빈 칸을 자동으로 채우기
-                            for (int ticketIndex = 0;
-                                ticketIndex < controller.tickets.length;
-                                ticketIndex++) {
-                              final ticket = controller.tickets[ticketIndex];
-                              for (final row in ticket.lottoRows) {
-                                // 빈 칸이면 자동 생성
-                                if (!row.numbers.any((num) => num > 0)) {
-                                  controller.generateAutoNumbers(
-                                    ticketIndex: ticketIndex,
-                                    rowName: row.rowName,
-                                  );
-                                }
-                              }
-                            }
-                            // Get.snackbar(
-                            //   '일괄 자동',
-                            //   '일괄 자동이 적용되었습니다.',
-                            //   backgroundColor: Colors.green.shade100,
-                            //   duration: const Duration(seconds: 1),
-                            //   animationDuration: const Duration(milliseconds: 0),
-                            //   snackPosition: SnackPosition.TOP,
-                            //   margin: const EdgeInsets.all(8),
-                            // );
+                        return GridView.builder(
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 1.8,
+                            crossAxisSpacing: 6,
+                            mainAxisSpacing: 6,
+                          ),
+                          itemCount: controller.tickets.length,
+                          itemBuilder: (context, index) {
+                            return MiniLottoTicketWidget(index: index);
                           },
-                          icon: const Icon(Icons.flash_on),
-                          label: const Text('일괄 자동'),
+                        );
+                      }),
+                    ),
+                  ),
+
+                  // 하단 버튼 영역
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, -2),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Obx(() {
-                          // 추첨일(토요일) 여부 확인
-                          final isDrawDay = controller.isDrawDay.value;
-                          // 구매 완료 여부 확인
-                          final isPurchaseCompleted =
-                              controller.purchaseCompleted.value;
-
-                          // 총 구매금액 계산
-                          final totalAmount = controller.tickets
-                              .fold(0, (sum, ticket) => sum + ticket.amount);
-
-                          // 총 구매금액이 0보다 크면 구매하기, 아니면 넘어가기
-                          final canPurchase = totalAmount > 0;
-
-                          // 항상 구매하기 또는 넘어가기 버튼만 표시 (결과 확인 버튼 제거)
-                          return ElevatedButton.icon(
-                            key: canPurchase
-                                ? _purchaseButtonKey
-                                : null, // 구매 버튼에만 키 추가
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
                             onPressed: () {
                               // 이미 스낵바가 표시 중인지 확인
                               if (Get.isSnackbarOpen) {
                                 return; // 이미 스낵바가 열려있으면 추가 스낵바를 표시하지 않음
                               }
 
-                              if (canPurchase) {
-                                // 구매하는 경우 애니메이션 효과 추가
-                                final ticketCount = controller.tickets.length;
-                                // 티켓 수에 따라 애니메이션 아이콘 개수 조절
-                                _addFloatingIcons(
-                                    _calculateIconCount(ticketCount));
-
-                                // 구매 시도
-                                controller.tryPurchaseTickets();
-                                // 성공 여부는 tryPurchaseTickets 메소드 내에서 처리함
-                              } else {
-                                // 총 구매금액이 0일 때는 다음 날로 넘어가기
-                                controller.moveToNextDay();
-                                Get.snackbar(
-                                  '다음 날로 이동',
-                                  '다음 날로 이동했습니다.',
-                                  backgroundColor: Colors.blue.shade100,
-                                  duration: const Duration(milliseconds: 300),
-                                  animationDuration:
-                                      const Duration(milliseconds: 0),
-                                  snackPosition: SnackPosition.TOP,
-                                  margin: const EdgeInsets.all(8),
-                                );
+                              // 다이얼로그 없이 바로 모든 티켓의 빈 칸을 자동으로 채우기
+                              for (int ticketIndex = 0;
+                                  ticketIndex < controller.tickets.length;
+                                  ticketIndex++) {
+                                final ticket = controller.tickets[ticketIndex];
+                                for (final row in ticket.lottoRows) {
+                                  // 빈 칸이면 자동 생성
+                                  if (!row.numbers.any((num) => num > 0)) {
+                                    controller.generateAutoNumbers(
+                                      ticketIndex: ticketIndex,
+                                      rowName: row.rowName,
+                                    );
+                                  }
+                                }
                               }
+                              // Get.snackbar(
+                              //   '일괄 자동',
+                              //   '일괄 자동이 적용되었습니다.',
+                              //   backgroundColor: Colors.green.shade100,
+                              //   duration: const Duration(seconds: 1),
+                              //   animationDuration: const Duration(milliseconds: 0),
+                              //   snackPosition: SnackPosition.TOP,
+                              //   margin: const EdgeInsets.all(8),
+                              // );
                             },
-                            icon: Icon(canPurchase
-                                ? Icons.shopping_cart
-                                : Icons.arrow_forward),
-                            label: Text(canPurchase ? '구매하기' : '넘어가기'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  canPurchase ? Colors.blue : Colors.amber,
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
+                            icon: const Icon(Icons.flash_on),
+                            label: const Text('일괄 자동'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Obx(() {
+                            // 추첨일(토요일) 여부 확인
+                            final isDrawDay = controller.isDrawDay.value;
+                            // 구매 완료 여부 확인
+                            final isPurchaseCompleted =
+                                controller.purchaseCompleted.value;
+
+                            // 총 구매금액 계산
+                            final totalAmount = controller.tickets
+                                .fold(0, (sum, ticket) => sum + ticket.amount);
+
+                            // 총 구매금액이 0보다 크면 구매하기, 아니면 넘어가기
+                            final canPurchase = totalAmount > 0;
+
+                            // 항상 구매하기 또는 넘어가기 버튼만 표시 (결과 확인 버튼 제거)
+                            return ElevatedButton.icon(
+                              key: canPurchase
+                                  ? _purchaseButtonKey
+                                  : null, // 구매 버튼에만 키 추가
+                              onPressed: () {
+                                // 이미 스낵바가 표시 중인지 확인
+                                if (Get.isSnackbarOpen) {
+                                  return; // 이미 스낵바가 열려있으면 추가 스낵바를 표시하지 않음
+                                }
+
+                                if (canPurchase) {
+                                  // 구매하는 경우 애니메이션 효과 추가
+                                  final ticketCount = controller.tickets.length;
+                                  // 티켓 수에 따라 애니메이션 아이콘 개수 조절
+                                  _addFloatingIcons(
+                                      _calculateIconCount(ticketCount));
+
+                                  // 구매 시도
+                                  controller.tryPurchaseTickets();
+                                  // 성공 여부는 tryPurchaseTickets 메소드 내에서 처리함
+                                } else {
+                                  // 총 구매금액이 0일 때는 다음 날로 넘어가기
+                                  controller.moveToNextDay();
+                                  Get.snackbar(
+                                    '다음 날로 이동',
+                                    '다음 날로 이동했습니다.',
+                                    backgroundColor: Colors.blue.shade100,
+                                    duration: const Duration(milliseconds: 300),
+                                    animationDuration:
+                                        const Duration(milliseconds: 0),
+                                    snackPosition: SnackPosition.TOP,
+                                    margin: const EdgeInsets.all(8),
+                                  );
+                                }
+                              },
+                              icon: Icon(canPurchase
+                                  ? Icons.shopping_cart
+                                  : Icons.arrow_forward),
+                              label: Text(canPurchase ? '구매하기' : '넘어가기'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    canPurchase ? Colors.blue : Colors.amber,
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        // 날아가는 아이콘 애니메이션 표시
-        ..._floatingIcons,
-      ],
+          // 날아가는 아이콘 애니메이션 표시
+          ..._floatingIcons,
+        ],
+      ),
     );
   }
 }
