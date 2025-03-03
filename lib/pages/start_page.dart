@@ -26,12 +26,11 @@ class StartPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                InkWell(
+                GestureDetector(
                   onTap: () => Get.offAllNamed('/main'),
-                  borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 30, horizontal: 80),
+                        vertical: 110, horizontal: 80),
                     decoration: BoxDecoration(
                       // color: Colors.blue.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
@@ -50,6 +49,18 @@ class StartPage extends StatelessWidget {
             ),
           ),
           Positioned(
+            right: 70,
+            bottom: 20,
+            child: IconButton(
+              icon: const Icon(
+                Icons.help_outline,
+                size: 30,
+                color: Colors.blue,
+              ),
+              onPressed: () => _showHelpDialog(context),
+            ),
+          ),
+          Positioned(
             right: 20,
             bottom: 20,
             child: IconButton(
@@ -63,6 +74,63 @@ class StartPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            '게임 방법',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  '로또 시뮬레이션 게임',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 8),
+                Text('1. 매일 원하는 만큼 로또 티켓을 구매할 수 있습니다. (하루 최대 10만원)'),
+                SizedBox(height: 4),
+                Text('2. 월요일, 수요일 등 원하는 요일에 자동으로 구매하거나 수동으로 번호를 선택할 수 있습니다.'),
+                SizedBox(height: 4),
+                Text('3. 토요일에는 추첨 결과를 확인할 수 있습니다.'),
+                SizedBox(height: 4),
+                Text('4. 당첨금은 자동으로 계좌에 입금됩니다.'),
+                SizedBox(height: 4),
+                Text('5. 티켓을 구매하지 않은 날은 \'넘어가기\' 버튼을 눌러 다음 날로 이동할 수 있습니다.'),
+                SizedBox(height: 8),
+                Text(
+                  '당첨금 규모',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 8),
+                Text('1등: 6개 번호 일치 - 10억원 이상'),
+                SizedBox(height: 4),
+                Text('2등: 5개 번호 + 보너스 번호 일치 - 5천만원 이상'),
+                SizedBox(height: 4),
+                Text('3등: 5개 번호 일치 - 150만원 이상'),
+                SizedBox(height: 4),
+                Text('4등: 4개 번호 일치 - 5만원'),
+                SizedBox(height: 4),
+                Text('5등: 3개 번호 일치 - 5천원'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
     );
   }
 
