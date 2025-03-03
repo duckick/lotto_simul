@@ -58,6 +58,9 @@ class StartPage extends StatelessWidget {
                 color: Colors.blue,
               ),
               onPressed: () => _showHelpDialog(context),
+              style: IconButton.styleFrom(
+                highlightColor: Colors.transparent,
+              ),
             ),
           ),
           Positioned(
@@ -70,6 +73,9 @@ class StartPage extends StatelessWidget {
                 color: Colors.blue,
               ),
               onPressed: () => _showSettingsDialog(context),
+              style: IconButton.styleFrom(
+                highlightColor: Colors.transparent,
+              ),
             ),
           ),
         ],
@@ -123,10 +129,19 @@ class StartPage extends StatelessWidget {
               ],
             ),
           ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('확인'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             ),
           ],
         );
@@ -154,10 +169,19 @@ class StartPage extends StatelessWidget {
               ),
             ],
           ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('닫기'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             ),
           ],
         );
@@ -177,10 +201,19 @@ class StartPage extends StatelessWidget {
               color: Colors.red,
             ),
           ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('취소'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             ),
             TextButton(
               onPressed: () async {
@@ -200,6 +233,12 @@ class StartPage extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.red,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
             ),
