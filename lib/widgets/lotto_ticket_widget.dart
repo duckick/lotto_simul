@@ -13,70 +13,70 @@ class LottoTicketWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final LottoTicketController controller = Get.find<LottoTicketController>();
 
-    return Transform.scale(
-      scale: 1.0,
-      child: Obx(() {
-        final lottoTicket = controller.tickets[index];
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-          decoration: BoxDecoration(border: Border.all(color: Colors.black)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 헤더 영역
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'LOTTO',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  Text('제 ${lottoTicket.round}회'),
-                ],
-              ),
-              const Divider(height: 4.0, thickness: 1.0),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '발행일 : ${DateFormat('yyyy/MM/dd').format(lottoTicket.issueDate)}',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2.0),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '추첨일 : ${DateFormat('yyyy/MM/dd').format(lottoTicket.drawDate)}',
-                  ),
-                ],
-              ),
-              const Divider(height: 8.0),
-              // 로또 번호 행들 (게임 당 세로 간격 최소화)
-              ...lottoTicket.lottoRows
-                  .map((row) => _buildLottoRow(row, controller))
-                  .toList(),
-              const Divider(height: 4.0),
-              // 하단 금액 및 바코드 영역
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '금액 : ₩${NumberFormat('#,###').format(lottoTicket.amount)}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  controller.purchaseCompleted.value
-                      ? _generateBarcode(lottoTicket)
-                      : Container(),
-                ],
-              ),
-            ],
-          ),
-        );
-      }),
-    );
+    return Obx(() {
+      final lottoTicket = controller.tickets[index];
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(4), // 각진 모서리
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 헤더 영역
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'LOTTO',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                Text('제 ${lottoTicket.round}회'),
+              ],
+            ),
+            const Divider(height: 4.0, thickness: 1.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '발행일 : ${DateFormat('yyyy/MM/dd').format(lottoTicket.issueDate)}',
+                ),
+              ],
+            ),
+            const SizedBox(height: 2.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '추첨일 : ${DateFormat('yyyy/MM/dd').format(lottoTicket.drawDate)}',
+                ),
+              ],
+            ),
+            const Divider(height: 8.0),
+            // 로또 번호 행들 (게임 당 세로 간격 최소화)
+            ...lottoTicket.lottoRows
+                .map((row) => _buildLottoRow(row, controller))
+                .toList(),
+            const Divider(height: 4.0),
+            // 하단 금액 및 바코드 영역
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '금액 : ₩${NumberFormat('#,###').format(lottoTicket.amount)}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                controller.purchaseCompleted.value
+                    ? _generateBarcode(lottoTicket)
+                    : Container(),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildLottoRow(LottoRow row, LottoTicketController controller) {
@@ -114,8 +114,9 @@ class LottoTicketWidget extends StatelessWidget {
                               color: number > 0
                                   ? Colors.blue.shade100
                                   : Colors.white,
-                              border: Border.all(color: Colors.grey),
-                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius:
+                                  BorderRadius.circular(2), // 더 각진 모서리
                             ),
                             alignment: Alignment.center,
                             child: Text(
@@ -153,8 +154,9 @@ class LottoTicketWidget extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 6.0, vertical: 5.0),
               minimumSize: const Size(0, 0),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              elevation: 0, // 그림자 제거
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.zero,
+                borderRadius: BorderRadius.circular(2), // 더 각진 모서리
               ),
               textStyle: const TextStyle(fontSize: 12),
             ),
@@ -187,8 +189,9 @@ class LottoTicketWidget extends StatelessWidget {
       Dialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(4), // 더 각진 모서리
         ),
+        elevation: 0, // 그림자 제거
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: GridView.builder(
@@ -226,9 +229,9 @@ class LottoTicketWidget extends StatelessWidget {
                             ? Colors.grey.shade300
                             : Colors.white,
                     border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey,
+                      color: isSelected ? Colors.blue : Colors.grey.shade300,
                     ),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(2), // 더 각진 모서리
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -257,12 +260,18 @@ class LottoTicketWidget extends StatelessWidget {
   Widget _generateBarcode(LottoTicket lottoTicket) {
     String data =
         '${lottoTicket.round}-${lottoTicket.issueDate.millisecondsSinceEpoch}-${lottoTicket.amount}';
-    return BarcodeWidget(
-      barcode: Barcode.code93(),
-      data: data,
-      width: 70,
-      height: 26,
-      drawText: false,
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(2), // 모서리 각지게
+      ),
+      child: BarcodeWidget(
+        barcode: Barcode.code93(),
+        data: data,
+        width: 70,
+        height: 26,
+        drawText: false,
+      ),
     );
   }
 }

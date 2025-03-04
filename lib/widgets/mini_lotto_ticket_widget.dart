@@ -34,7 +34,7 @@ class MiniLottoTicketWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(4), // 더 각진 모서리로 변경
           ),
           padding: const EdgeInsets.fromLTRB(6, 4, 6, 0), // 상단 패딩도 줄임
           child: Column(
@@ -66,7 +66,8 @@ class MiniLottoTicketWidget extends StatelessWidget {
                         padding: const EdgeInsets.all(1), // 패딩 줄임
                         decoration: BoxDecoration(
                           color: Colors.red.withOpacity(0.1),
-                          shape: BoxShape.circle,
+                          shape: BoxShape.rectangle, // 원형에서 사각형으로 변경
+                          borderRadius: BorderRadius.circular(2), // 살짝 둥근 모서리
                         ),
                         child: Icon(
                           Icons.close,
@@ -121,7 +122,8 @@ class MiniLottoTicketWidget extends StatelessWidget {
                                       margin: const EdgeInsets.symmetric(
                                           horizontal: 2), // 가로 여백 조정 (3 -> 2)
                                       decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
+                                        borderRadius: BorderRadius.circular(
+                                            2), // 원형에서 약간 둥근 사각형으로 변경
                                         color: row.isAuto
                                             ? Colors.green.withOpacity(0.2)
                                             : Colors.orange.withOpacity(0.2),
@@ -154,7 +156,8 @@ class MiniLottoTicketWidget extends StatelessWidget {
                                 margin: const EdgeInsets.symmetric(
                                     horizontal: 2), // 가로 여백 조정 (3 -> 2)
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.circular(
+                                      2), // 원형에서 약간 둥근 사각형으로 변경
                                   border: Border.all(
                                     color: Colors.grey.shade300,
                                     width: 1,
@@ -179,6 +182,9 @@ class MiniLottoTicketWidget extends StatelessWidget {
     Get.dialog(
       Dialog(
         insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4), // 다이얼로그 모서리를 각지게 변경
+        ),
         child: Container(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -197,6 +203,9 @@ class MiniLottoTicketWidget extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
+                    style: IconButton.styleFrom(
+                      highlightColor: Colors.transparent, // 하이라이트 효과 제거
+                    ),
                     onPressed: () => Get.back(),
                   ),
                 ],
