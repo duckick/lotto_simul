@@ -37,7 +37,7 @@ class _FloatingIconAnimationState extends State<FloatingIconAnimation>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
@@ -99,8 +99,8 @@ class _FloatingIconAnimationState extends State<FloatingIconAnimation>
       animation: _controller,
       builder: (context, child) {
         return Positioned(
-          left: widget.startPosition.dx + _positionAnimation.value.dx * 100,
-          top: widget.startPosition.dy + _positionAnimation.value.dy * 100,
+          left: widget.startPosition.dx + _positionAnimation.value.dx * 40,
+          top: widget.startPosition.dy + _positionAnimation.value.dy * 40,
           child: Opacity(
             opacity: _opacityAnimation.value,
             child: Transform.scale(
@@ -118,6 +118,56 @@ class _FloatingIconAnimationState extends State<FloatingIconAnimation>
   }
 }
 
+// 눌림 효과가 있는 버튼 위젯
+class PressableButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+  final double scaleDownTo;
+  final Duration duration;
+
+  const PressableButton({
+    Key? key,
+    required this.child,
+    required this.onPressed,
+    this.scaleDownTo = 0.95,
+    this.duration = const Duration(milliseconds: 100),
+  }) : super(key: key);
+
+  @override
+  State<PressableButton> createState() => _PressableButtonState();
+}
+
+class _PressableButtonState extends State<PressableButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() {
+          _isPressed = true;
+        });
+      },
+      onTapUp: (_) {
+        setState(() {
+          _isPressed = false;
+        });
+        widget.onPressed();
+      },
+      onTapCancel: () {
+        setState(() {
+          _isPressed = false;
+        });
+      },
+      child: AnimatedScale(
+        scale: _isPressed ? widget.scaleDownTo : 1.0,
+        duration: widget.duration,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class PlayPage extends StatefulWidget {
   const PlayPage({Key? key}) : super(key: key);
 
@@ -125,7 +175,8 @@ class PlayPage extends StatefulWidget {
   State<PlayPage> createState() => _PlayPageState();
 }
 
-class _PlayPageState extends State<PlayPage> {
+class _PlayPageState extends State<PlayPage>
+    with SingleTickerProviderStateMixin {
   final List<FloatingIconAnimation> _floatingIcons = [];
   final GlobalKey _purchaseButtonKey = GlobalKey();
 
@@ -262,7 +313,7 @@ class _PlayPageState extends State<PlayPage> {
                 children: [
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       border: Border(
@@ -287,12 +338,13 @@ class _PlayPageState extends State<PlayPage> {
                         Row(
                           children: [
                             // 통계 버튼
-                            IconButton(
-                              icon: const Icon(Icons.bar_chart),
-                              tooltip: '당첨 통계',
+                            PressableButton(
                               onPressed: () => controller.goToStatsPage(),
-                              style: IconButton.styleFrom(
-                                highlightColor: Colors.transparent,
+                              scaleDownTo: 0.9,
+                              child: Icon(
+                                Icons.bar_chart,
+                                color: Colors.black54,
+                                size: 24,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -314,7 +366,7 @@ class _PlayPageState extends State<PlayPage> {
                   // 상단 요약 정보
                   Padding(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     child: Row(
                       children: [
                         Expanded(
@@ -336,7 +388,7 @@ class _PlayPageState extends State<PlayPage> {
                                 ),
                                 color: Colors.blue.shade50,
                                 child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
+                                  padding: const EdgeInsets.all(11.0),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment:
@@ -361,62 +413,54 @@ class _PlayPageState extends State<PlayPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Obx(() {
-                            return Container(
-                              height: 65, // 56 + 9 = 65픽셀로 높이 증가
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () {
-                                    controller.addNewTicket();
-                                  },
-                                  borderRadius: BorderRadius.circular(4),
-                                  splashColor: Colors.transparent,
-                                  highlightColor: Colors.transparent,
-                                  child: Card(
-                                    margin: EdgeInsets.zero,
-                                    elevation: 0, // 그림자 제거
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(4), // 각진 모서리
-                                      side: BorderSide(
-                                        color: Colors.green.shade100,
-                                        width: 1,
-                                      ),
+                            return PressableButton(
+                              onPressed: () {
+                                controller.addNewTicket();
+                              },
+                              child: Container(
+                                height: 65, // 56 + 9 = 65픽셀로 높이 증가
+                                child: Card(
+                                  margin: EdgeInsets.zero,
+                                  elevation: 0, // 그림자 제거
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(4), // 각진 모서리
+                                    side: BorderSide(
+                                      color: Colors.green.shade100,
+                                      width: 1,
                                     ),
-                                    color: Colors.green.shade50,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12.0, vertical: 8.0),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const Text('총 티켓수',
-                                                  style:
-                                                      TextStyle(fontSize: 12)),
-                                              Text(
-                                                '${controller.tickets.length}장',
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                  ),
+                                  color: Colors.green.shade50,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(11.0),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text('총 티켓수',
+                                                style: TextStyle(fontSize: 12)),
+                                            Text(
+                                              '${controller.tickets.length}장',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
                                               ),
-                                            ],
-                                          ),
-                                          // 로또 추가 아이콘 표시
-                                          Icon(
-                                            Icons.add_circle,
-                                            color: Colors.green.shade700,
-                                            size: 28,
-                                          ),
-                                        ],
-                                      ),
+                                            ),
+                                          ],
+                                        ),
+                                        // 로또 추가 아이콘 표시
+                                        Icon(
+                                          Icons.add_circle,
+                                          color: Colors.green.shade700,
+                                          size: 28,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -467,7 +511,7 @@ class _PlayPageState extends State<PlayPage> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
+                          child: PressableButton(
                             onPressed: () {
                               // 이미 스낵바가 표시 중인지 확인
                               if (Get.isSnackbarOpen) {
@@ -490,15 +534,21 @@ class _PlayPageState extends State<PlayPage> {
                                 }
                               }
                             },
-                            icon: const Icon(Icons.flash_on),
-                            label: const Text('일괄 자동'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.black87,
-                              side: const BorderSide(color: Colors.black26),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
+                            child: OutlinedButton.icon(
+                              onPressed:
+                                  null, // 실제 onPressed는 PressableButton에서 처리
+                              icon: const Icon(Icons.flash_on),
+                              label: const Text('일괄 자동'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.black87,
+                                disabledForegroundColor: Colors.black87,
+                                side: const BorderSide(color: Colors.black26),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
@@ -519,10 +569,7 @@ class _PlayPageState extends State<PlayPage> {
                             final canPurchase = totalAmount > 0;
 
                             // 항상 구매하기 또는 넘어가기 버튼만 표시 (결과 확인 버튼 제거)
-                            return ElevatedButton.icon(
-                              key: canPurchase
-                                  ? _purchaseButtonKey
-                                  : null, // 구매 버튼에만 키 추가
+                            return PressableButton(
                               onPressed: () {
                                 // 이미 스낵바가 표시 중인지 확인
                                 if (Get.isSnackbarOpen) {
@@ -567,21 +614,31 @@ class _PlayPageState extends State<PlayPage> {
                                   );
                                 }
                               },
-                              icon: Icon(canPurchase
-                                  ? Icons.shopping_cart
-                                  : Icons.arrow_forward),
-                              label: Text(canPurchase ? '구매하기' : '넘어가기'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    canPurchase ? Colors.blue : Colors.amber,
-                                foregroundColor: Colors.white,
-                                elevation: 0, // 그림자 제거
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(4), // 각진 모서리
+                              child: ElevatedButton.icon(
+                                key: canPurchase
+                                    ? _purchaseButtonKey
+                                    : null, // 구매 버튼에만 키 추가
+                                onPressed:
+                                    null, // 실제 onPressed는 PressableButton에서 처리
+                                icon: Icon(canPurchase
+                                    ? Icons.shopping_cart
+                                    : Icons.arrow_forward),
+                                label: Text(canPurchase ? '구매하기' : '넘어가기'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      canPurchase ? Colors.blue : Colors.amber,
+                                  disabledBackgroundColor:
+                                      canPurchase ? Colors.blue : Colors.amber,
+                                  foregroundColor: Colors.white,
+                                  disabledForegroundColor: Colors.white,
+                                  elevation: 0, // 그림자 제거
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(4), // 각진 모서리
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                 ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
                               ),
                             );
                           }),

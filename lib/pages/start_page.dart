@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/lotto_ticket_controller.dart';
 import '../services/database_service.dart';
+import 'play_page.dart'; // PressableButton 위젯을 사용하기 위한 import
 
 class StartPage extends StatelessWidget {
   const StartPage({Key? key}) : super(key: key);
@@ -26,8 +27,10 @@ class StartPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () => Get.offAllNamed('/main'),
+                PressableButton(
+                  onPressed: () => Get.offAllNamed('/main'),
+                  scaleDownTo: 0.95,
+                  duration: const Duration(milliseconds: 150),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                         vertical: 110, horizontal: 80),
@@ -49,32 +52,39 @@ class StartPage extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: 70,
+            right: 10,
             bottom: 20,
-            child: IconButton(
-              icon: const Icon(
-                Icons.help_outline,
-                size: 30,
-                color: Colors.blue,
-              ),
-              onPressed: () => _showHelpDialog(context),
-              style: IconButton.styleFrom(
-                highlightColor: Colors.transparent,
-              ),
-            ),
-          ),
-          Positioned(
-            right: 20,
-            bottom: 20,
-            child: IconButton(
-              icon: const Icon(
-                Icons.settings,
-                size: 30,
-                color: Colors.blue,
-              ),
-              onPressed: () => _showSettingsDialog(context),
-              style: IconButton.styleFrom(
-                highlightColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // 헬프 버튼
+                  PressableButton(
+                    onPressed: () => _showHelpDialog(context),
+                    scaleDownTo: 0.9,
+                    duration: const Duration(milliseconds: 100),
+                    child: const Icon(
+                      Icons.help_outline,
+                      color: Colors.blue,
+                      size: 28,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 10,
+                  ),
+                  // 설정 버튼
+                  PressableButton(
+                    onPressed: () => _showSettingsDialog(context),
+                    scaleDownTo: 0.9,
+                    duration: const Duration(milliseconds: 100),
+                    child: const Icon(
+                      Icons.settings,
+                      color: Colors.grey,
+                      size: 28,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
