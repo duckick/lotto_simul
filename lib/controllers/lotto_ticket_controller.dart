@@ -3,12 +3,6 @@ import '../models/lotto_models.dart';
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../services/lotto_draw_service.dart';
-<<<<<<< HEAD
-
-// 전역 변수로 다이얼로그 플래그 선언 (싱글톤 패턴)
-bool _isGlobalDialogShowing = false;
-=======
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
 
 class LottoTicketController extends GetxController {
   final currentDate = DateTime.now().obs;
@@ -25,12 +19,6 @@ class LottoTicketController extends GetxController {
   final totalSpent = 0.obs; // 총 구매 금액
   final shouldShowResult = false.obs; // 결과 팝업을 표시해야 하는지 여부
 
-<<<<<<< HEAD
-  // 다이얼로그 표시 중인지 추적하는 변수 추가
-  final isResultDialogShowing = false.obs;
-
-=======
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
   // purchaseCompleted 변수는 더 이상 사용하지 않지만 기존 코드와의 호환성을 위해 유지
   final purchaseCompleted = false.obs;
   final autoNumber = false.obs; // 자동 구매 여부를 관리하는 변수 (체크박스 상태)
@@ -67,36 +55,14 @@ class LottoTicketController extends GetxController {
 
   // 다음 날로 이동
   Future<void> moveToNextDay() async {
-<<<<<<< HEAD
-    print("moveToNextDay 호출 시작");
-
-    // 현재 날짜가 토요일인지 확인
-    final isCurrentlySaturday = currentDate.value.weekday == DateTime.saturday;
-=======
     // 현재 날짜가 토요일인지 확인
     final isCurrentlySaturday = isCurrentDateDrawDay();
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
 
     // 이미 다이얼로그가 표시 중인지 확인
     final isDialogOpen = Get.isDialogOpen ?? false;
 
     // 디버깅 로그 추가
     print(
-<<<<<<< HEAD
-        'moveToNextDay 호출: 토요일=$isCurrentlySaturday, shouldShowResult=${shouldShowResult.value}, isDialogOpen=$isDialogOpen, isResultDialogShowing=${isResultDialogShowing.value}, _isGlobalDialogShowing=$_isGlobalDialogShowing');
-
-    // 토요일이면 추첨 결과를 확인하고 결과 다이얼로그 표시 (중복 방지 로직 강화)
-    if (isCurrentlySaturday && !_isGlobalDialogShowing) {
-      print("토요일이고 다이얼로그가 표시되지 않은 상태");
-      _isGlobalDialogShowing = true; // 즉시 플래그 설정
-      await checkDrawResults();
-
-      // 직접 다이얼로그를 표시하도록 함수 호출
-      _showResultDialog();
-      return; // 여기서 리턴하여 _showResultDialog 내에서 다음 날로 이동하도록 함
-    } else if (isCurrentlySaturday && _isGlobalDialogShowing) {
-      print("토요일이지만 이미 다이얼로그가 표시된 상태");
-=======
         'moveToNextDay 호출: 토요일=$isCurrentlySaturday, shouldShowResult=${shouldShowResult.value}, isDialogOpen=$isDialogOpen');
 
     // 토요일이면 추첨 결과를 확인하고 결과 다이얼로그 표시 (중복 방지 로직 추가)
@@ -109,7 +75,6 @@ class LottoTicketController extends GetxController {
       return; // 여기서 리턴하여 _showResultDialogAfterDelay 내에서 다음 날로 이동하도록 함
     } else if (isCurrentlySaturday &&
         (shouldShowResult.value || isDialogOpen)) {
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
       // 이미 결과 다이얼로그를 표시 중인 경우는 다이얼로그 표시 없이 다음 날로 진행
       shouldShowResult.value = false;
       // 바로 다음 날로 이동
@@ -117,11 +82,6 @@ class LottoTicketController extends GetxController {
       return;
     }
 
-<<<<<<< HEAD
-    print("토요일이 아니거나 다른 조건: 다음 날로 이동");
-
-=======
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
     // 토요일이 아니면 결과 팝업 표시 신호 초기화
     shouldShowResult.value = false;
 
@@ -303,11 +263,6 @@ class LottoTicketController extends GetxController {
 
   // 로또 구매 시도
   Future<void> tryPurchaseTickets() async {
-<<<<<<< HEAD
-    print("tryPurchaseTickets 호출 시작");
-
-=======
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
     // 이미 구매 완료된 경우
     if (purchaseCompleted.value) {
       Get.snackbar(
@@ -375,27 +330,6 @@ class LottoTicketController extends GetxController {
 
     // 토요일에 구매한 경우
     if (isDrawDay.value) {
-<<<<<<< HEAD
-      print("토요일에 구매 시도");
-
-      // 이미 다이얼로그가 표시 중인지 확인 (중복 방지 로직 강화)
-      if (_isGlobalDialogShowing) {
-        print("이미 다이얼로그가 표시 중이므로 리턴");
-        return;
-      }
-
-      // 전역 플래그 설정
-      _isGlobalDialogShowing = true;
-
-      print("다이얼로그가 표시되지 않은 상태이므로 checkDrawResults 호출");
-      // 토요일인 경우 checkDrawResults()만 호출하고
-      // moveToNextDay()는 호출하지 않음 (중복 다이얼로그 방지)
-      await checkDrawResults();
-
-      print("_showResultDialog 호출");
-      // 결과 다이얼로그 표시
-      _showResultDialog(); // 다이얼로그는 표시
-=======
       // 이미 다이얼로그가 표시 중인지 확인 (중복 방지)
       if (Get.isDialogOpen ?? false) {
         return;
@@ -407,7 +341,6 @@ class LottoTicketController extends GetxController {
       // 결과 다이얼로그 표시 상태로 설정
       shouldShowResult.value = true;
       _showResultDialogAfterDelay(); // 다이얼로그는 표시
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
     } else {
       // 토요일이 아닌 경우 바로 다음 날로 이동
       await moveToNextDay();
@@ -440,24 +373,6 @@ class LottoTicketController extends GetxController {
     }
   }
 
-<<<<<<< HEAD
-  // 결과 다이얼로그를 표시하는 함수 (지연 없이 바로 표시)
-  void _showResultDialog() async {
-    print("_showResultDialog 시작");
-
-    // 전역 플래그로 이중 체크
-    if (!_isGlobalDialogShowing) {
-      print("전역 플래그가 false인데 _showResultDialog가 호출됨 (비정상 호출)");
-      return;
-    }
-
-    try {
-      print("getCurrentRoundTicketCount 호출");
-      // 이번 회차 구매한 티켓 수 조회
-      final ticketCount = await getCurrentRoundTicketCount();
-
-      print("당첨 결과 그룹화");
-=======
   // 지연 후 결과 다이얼로그를 표시하는 함수
   void _showResultDialogAfterDelay() {
     Future.delayed(const Duration(milliseconds: 300), () async {
@@ -469,7 +384,6 @@ class LottoTicketController extends GetxController {
       // 이번 회차 구매한 티켓 수 조회
       final ticketCount = await getCurrentRoundTicketCount();
 
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
       // 당첨 결과를 등수별로 그룹화
       final Map<int, List<Map<String, dynamic>>> groupedResults = {};
 
@@ -484,14 +398,8 @@ class LottoTicketController extends GetxController {
       // 등수 순서대로 정렬 (1등부터 5등까지)
       final sortedRanks = groupedResults.keys.toList()..sort();
 
-<<<<<<< HEAD
-      print("Get.dialog 호출");
-      // 로또 결과 다이얼로그를 직접 호출
-      await Get.dialog(
-=======
       // 로또 결과 다이얼로그를 직접 호출
       Get.dialog(
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
         AlertDialog(
           title: const Text('당첨 결과',
               style: TextStyle(fontWeight: FontWeight.bold)),
@@ -560,19 +468,6 @@ class LottoTicketController extends GetxController {
 
                               return Padding(
                                 padding: const EdgeInsets.only(
-<<<<<<< HEAD
-                                    left: 8.0, bottom: 4.0),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      purchaseDateStr,
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.grey),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    ...numbers.map((num) =>
-                                        _buildLottoBall(num, false, size: 24)),
-=======
                                     bottom: 4.0, left: 8.0),
                                 child: Row(
                                   children: [
@@ -587,35 +482,17 @@ class LottoTicketController extends GetxController {
                                           color: Colors.grey[600],
                                         ),
                                       ),
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
                                   ],
                                 ),
                               );
                             }).toList(),
-<<<<<<< HEAD
-=======
                             const Divider(),
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
                           ],
                         ),
                       );
                     }).toList(),
 
                   // 이번 회차 구매한 티켓 수 표시
-<<<<<<< HEAD
-                  const Divider(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('이번 회차 구매한 로또:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('$ticketCount장',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                      ],
-=======
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.center,
@@ -626,7 +503,6 @@ class LottoTicketController extends GetxController {
                         color: Colors.grey[600],
                         fontStyle: FontStyle.italic,
                       ),
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
                     ),
                   ),
                 ],
@@ -636,39 +512,6 @@ class LottoTicketController extends GetxController {
           actions: [
             TextButton(
               onPressed: () {
-<<<<<<< HEAD
-                print("다이얼로그 확인 버튼 클릭");
-                Get.back(); // 다이얼로그 닫기
-                // 다이얼로그가 닫힌 후 다음 날로 이동
-                actuallyMoveToNextDay();
-              },
-              child: const Text('확인'),
-            ),
-          ],
-        ),
-        barrierDismissible: false, // 바깥 영역 터치로 닫기 방지
-      ).then((_) {
-        print("다이얼로그 닫힘 이벤트 처리");
-        // 다이얼로그가 닫힌 후 상태 업데이트
-        _isGlobalDialogShowing = false; // 전역 플래그 초기화
-        isResultDialogShowing.value = false;
-        shouldShowResult.value = false;
-        print("전역 플래그 및 상태 초기화 완료");
-      });
-    } catch (e) {
-      // 오류 발생 시 상태 초기화
-      _isGlobalDialogShowing = false; // 전역 플래그 초기화
-      isResultDialogShowing.value = false;
-      shouldShowResult.value = false;
-      print('결과 다이얼로그 표시 오류: $e');
-    }
-  }
-
-  // 지연 후 결과 다이얼로그를 표시하는 함수 (이전 함수는 유지하되 새 함수 호출)
-  void _showResultDialogAfterDelay() {
-    // 이전 코드와의 호환성을 위해 유지하되, 새로운 함수 호출
-    _showResultDialog();
-=======
                 Get.back(); // 다이얼로그 닫기
                 // 다음 날로 이동
                 actuallyMoveToNextDay();
@@ -680,7 +523,6 @@ class LottoTicketController extends GetxController {
         barrierDismissible: false, // 바깥쪽 터치로 닫히지 않도록 설정
       );
     });
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
   }
 
   // 로또 볼 위젯

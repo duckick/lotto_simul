@@ -99,8 +99,8 @@ class _FloatingIconAnimationState extends State<FloatingIconAnimation>
       animation: _controller,
       builder: (context, child) {
         return Positioned(
-          left: widget.startPosition.dx + _positionAnimation.value.dx * 40,
-          top: widget.startPosition.dy + _positionAnimation.value.dy * 40,
+          left: widget.startPosition.dx + _positionAnimation.value.dx * 50,
+          top: widget.startPosition.dy + _positionAnimation.value.dy * 50,
           child: Opacity(
             opacity: _opacityAnimation.value,
             child: Transform.scale(
@@ -601,11 +601,6 @@ class _PlayPageState extends State<PlayPage>
                                     controller.moveToNextDay();
                                   }
 
-<<<<<<< HEAD
-                                  // 스낵바 주석 처리
-                                  /*
-=======
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
                                   Get.snackbar(
                                     '다음 날로 이동',
                                     '다음 날로 이동했습니다.',
@@ -617,10 +612,6 @@ class _PlayPageState extends State<PlayPage>
                                     snackPosition: SnackPosition.TOP,
                                     margin: const EdgeInsets.all(8),
                                   );
-<<<<<<< HEAD
-                                  */
-=======
->>>>>>> de92c3109ac0aae6c8c4db9e2abb34306e2ee00a
                                 }
                               },
                               child: ElevatedButton.icon(
