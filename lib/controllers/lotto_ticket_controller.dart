@@ -3,6 +3,7 @@ import '../models/lotto_models.dart';
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../services/lotto_draw_service.dart';
+import '../services/prize_calculator_service.dart';
 
 class LottoTicketController extends GetxController {
   final currentDate = DateTime.now().obs;
@@ -26,6 +27,18 @@ class LottoTicketController extends GetxController {
   // 서비스 인스턴스
   final _dbService = DatabaseService.instance;
   final _drawService = LottoDrawService.instance;
+  final _prizeCalculatorService = PrizeCalculatorService.instance;
+
+  // 버튼 비활성화 상태 관리 변수
+  final isButtonDisabled = false.obs;
+
+  // 버튼 비활성화 처리 함수
+  void _disableButtonTemporarily() {
+    isButtonDisabled.value = true;
+    Future.delayed(const Duration(milliseconds: 100), () {
+      isButtonDisabled.value = false;
+    });
+  }
 
   // 다음 추첨일(토요일) 계산
   DateTime getNextDrawDate() {
@@ -55,6 +68,12 @@ class LottoTicketController extends GetxController {
 
   // 다음 날로 이동
   Future<void> moveToNextDay() async {
+    // 버튼 비활성화 상태면 무시
+    if (isButtonDisabled.value) return;
+
+    // 버튼 일시 비활성화
+    _disableButtonTemporarily();
+
     // 현재 날짜가 토요일인지 확인
     final isCurrentlySaturday = isCurrentDateDrawDay();
 
@@ -65,30 +84,26 @@ class LottoTicketController extends GetxController {
     print(
         'moveToNextDay 호출: 토요일=$isCurrentlySaturday, shouldShowResult=${shouldShowResult.value}, isDialogOpen=$isDialogOpen');
 
-    // 토요일이면 추첨 결과를 확인하고 결과 다이얼로그 표시 (중복 방지 로직 추가)
-    if (isCurrentlySaturday && !shouldShowResult.value && !isDialogOpen) {
+    // 토요일이면 추첨 결과를 확인하고 결과 다이얼로그를 표시
+    if (isCurrentlySaturday && !isDialogOpen) {
       await checkDrawResults();
-      // 결과 다이얼로그 표시 상태로 설정
-      shouldShowResult.value = true;
-      // 직접 다이얼로그를 표시하도록 함수 호출
-      _showResultDialogAfterDelay();
-      return; // 여기서 리턴하여 _showResultDialogAfterDelay 내에서 다음 날로 이동하도록 함
-    } else if (isCurrentlySaturday &&
-        (shouldShowResult.value || isDialogOpen)) {
-      // 이미 결과 다이얼로그를 표시 중인 경우는 다이얼로그 표시 없이 다음 날로 진행
-      shouldShowResult.value = false;
-      // 바로 다음 날로 이동
-      await actuallyMoveToNextDay();
+      // 결과 다이얼로그를 표시하고 닫기 버튼을 누르면 다음날로 이동
+      _showResultDialogWithNextDay();
       return;
     }
 
-    // 토요일이 아니면 결과 팝업 표시 신호 초기화
-    shouldShowResult.value = false;
+    // 토요일이 아니면 바로 다음 날로 이동
+    await actuallyMoveToNextDay();
+  }
+
+  // 실제로 다음 날로 이동하는 함수
+  Future<void> actuallyMoveToNextDay() async {
+    shouldShowResult.value = false; // 결과 팝업 표시 신호 초기화
 
     // 현재 티켓 수 저장
     final currentTicketCount = tickets.length;
 
-    // 날짜 변경
+    // 날짜 변경 - 딜레이 없이 즉시 변경
     currentDate.value = currentDate.value.add(const Duration(days: 1));
 
     // 구매 완료 상태 초기화 (더 이상 사용하지 않지만 호환성을 위해 유지)
@@ -118,48 +133,14 @@ class LottoTicketController extends GetxController {
     await _saveGameState();
   }
 
-  // 실제로 다음 날로 이동하는 함수 (결과 표시 후 호출됨)
-  Future<void> actuallyMoveToNextDay() async {
-    shouldShowResult.value = false; // 결과 팝업 표시 신호 초기화
-
-    // 현재 티켓 수 저장
-    final currentTicketCount = tickets.length;
-
-    // 날짜 변경
-    currentDate.value = currentDate.value.add(const Duration(days: 1));
-
-    // 구매 완료 상태 초기화 (더 이상 사용하지 않지만 호환성을 위해 유지)
-    purchaseCompleted.value = false;
-
-    // 티켓 목록 초기화하되, 같은 수의 빈 티켓 생성
-    tickets.clear();
-
-    // 이전과 동일한 수의 티켓 생성 (최소 1장)
-    final ticketsToCreate = currentTicketCount > 0 ? currentTicketCount : 1;
-    for (int i = 0; i < ticketsToCreate; i++) {
-      _addEmptyTicket();
-    }
-
-    // 추첨일 여부 업데이트
-    isDrawDay.value = isCurrentDateDrawDay();
-
-    // 추첨일인 경우 추첨 결과 확인 (다이얼로그는 표시하지 않음)
-    if (isDrawDay.value) {
-      await checkDrawResults();
-      // 여기서는 다이얼로그를 표시하지 않음 - 중복 방지
-    } else {
-      // 추첨일이 아니면 당첨 결과 초기화
-      winningResults.clear();
-      drawNumbers.clear();
-      bonusNumber.value = 0;
-    }
-
-    // 게임 상태 저장
-    await _saveGameState();
-  }
-
   // 이전 날로 이동
   Future<void> moveToPreviousDay() async {
+    // 버튼 비활성화 상태면 무시
+    if (isButtonDisabled.value) return;
+
+    // 버튼 일시 비활성화
+    _disableButtonTemporarily();
+
     // 현재 날짜가 일요일인지 확인
     final isCurrentlySunday = currentDate.value.weekday == 7;
 
@@ -208,21 +189,238 @@ class LottoTicketController extends GetxController {
     drawNumbers.assignAll(List<int>.from(drawResult['draw_numbers']));
     bonusNumber.value = drawResult['bonus_number'] as int;
 
-    // 이 추첨일에 해당하는 티켓의 당첨 여부 확인
-    final results =
-        await _drawService.checkAllTicketsForDrawDate(currentDate.value);
+    // 디버깅: 추첨 번호 출력
+    print('===== 당첨 번호 확인 시작 =====');
+    print('추첨 번호: ${drawNumbers.join(', ')} + ${bonusNumber.value}');
+
+    // 이번 회차 시작일(이전 일요일)
+    final startDate = DateTime(currentDate.value.year, currentDate.value.month,
+        currentDate.value.day - 6 // 일요일은 토요일로부터 6일 전
+        );
+
+    print(
+        '이번 회차 기간: ${startDate.toString().substring(0, 10)} ~ ${currentDate.value.toString().substring(0, 10)}');
+
+    // 이번 회차 모든 티켓 가져오기 (일요일부터 토요일까지)
+    final weekTickets = [];
+
+    // 일요일부터 토요일까지 각 날짜에 구매한 티켓 가져오기
+    for (int i = 0; i < 7; i++) {
+      final day = startDate.add(Duration(days: i));
+      final dailyTickets = await _dbService.getTicketsOnDate(day);
+
+      if (dailyTickets.isNotEmpty) {
+        print(
+            '${day.toString().substring(0, 10)}에 구매한 티켓: ${dailyTickets.length}장');
+
+        // 각 티켓의 번호 출력 (첫 3개만)
+        int count = 0;
+        for (var ticket in dailyTickets) {
+          if (count < 3) {
+            try {
+              final lottoRows =
+                  List<Map<String, dynamic>>.from(ticket['lotto_rows'] ?? []);
+              for (var row in lottoRows) {
+                final numbers = List<dynamic>.from(row['numbers'] ?? []);
+                if (numbers.isNotEmpty) {
+                  print('티켓 번호(원본): $numbers');
+                  print('티켓 번호 타입: ${numbers.runtimeType}');
+                }
+              }
+            } catch (e) {
+              print('티켓 정보 확인 오류: $e');
+            }
+            count++;
+          }
+        }
+      }
+
+      weekTickets.addAll(dailyTickets);
+    }
+
+    print('이번 회차 총 구매 티켓 수: ${weekTickets.length}');
+
+    // 모든 티켓 확인 및 당첨 여부 체크
+    final List<Map<String, dynamic>> allResults = [];
+
+    // 당첨 번호
+    final winNumbers = drawNumbers.toList();
+    final bonus = bonusNumber.value;
+
+    // 테스트용 변수 - 한 번이라도 티켓에 접근했는지 확인
+    bool processedAnyTicket = false;
+    bool processedAnyRow = false;
+
+    // 추첨 번호 로그 추가
+    print('최종 추첨 번호: ${winNumbers.join(", ")} + $bonus');
+
+    // 실제 티켓 확인
+    if (weekTickets.isNotEmpty) {
+      print('티켓 확인 시작 - 총 ${weekTickets.length}장');
+
+      int ticketIndex = 0;
+      for (var ticket in weekTickets) {
+        ticketIndex++;
+        try {
+          processedAnyTicket = true;
+          print('티켓 #$ticketIndex 확인 중...');
+
+          final lottoRows =
+              List<Map<String, dynamic>>.from(ticket['lotto_rows'] ?? []);
+          print('티켓 lottoRows 길이: ${lottoRows.length}');
+
+          int rowIndex = 0;
+          for (var row in lottoRows) {
+            rowIndex++;
+            processedAnyRow = true;
+            final rawNumbers = row['numbers'];
+
+            print('행 #$rowIndex 번호 데이터 타입: ${rawNumbers.runtimeType}');
+            print('행 #$rowIndex 번호 원본: $rawNumbers');
+
+            List<int> ticketNumbers = [];
+            // 다양한 형식의 번호를 처리하는 로직 개선
+            if (rawNumbers is List) {
+              for (var n in rawNumbers) {
+                int? num;
+                if (n is int) {
+                  num = n;
+                } else if (n is String) {
+                  num = int.tryParse(n);
+                } else if (n != null) {
+                  num = int.tryParse(n.toString());
+                }
+
+                if (num != null && num > 0) {
+                  ticketNumbers.add(num);
+                }
+              }
+            } else {
+              print('로또 번호가 리스트가 아님: $rawNumbers');
+              continue;
+            }
+
+            print('변환된 티켓 번호: $ticketNumbers');
+
+            // 유효한 번호가 하나라도 있으면 처리 (번호가 1개 이상이면 검사)
+            if (ticketNumbers.isEmpty) {
+              print('유효한 번호가 없음: 빈 리스트');
+              continue;
+            }
+
+            // 번호가 6개가 아닌 경우 로그만 남기고 계속 진행
+            if (ticketNumbers.length != 6) {
+              print('경고: 번호가 6개가 아님 - ${ticketNumbers.length}개 번호 발견');
+            }
+
+            // 일치하는 번호 개수 세기
+            int matchCount = 0;
+            bool hasBonus = false;
+            List<int> matchedNumbers = [];
+
+            // 각 번호별 일치 여부 확인 로그 추가
+            print('번호 비교 시작:');
+            print('- 티켓 번호: ${ticketNumbers.join(", ")}');
+            print('- 당첨 번호: ${winNumbers.join(", ")} + $bonus');
+
+            for (var num in ticketNumbers) {
+              if (winNumbers.contains(num)) {
+                matchCount++;
+                matchedNumbers.add(num);
+                print('일치하는 번호 발견: $num');
+              }
+              if (num == bonus) {
+                hasBonus = true;
+                print('보너스 번호 일치: $num');
+              }
+            }
+
+            print('매치 개수: $matchCount, 보너스: $hasBonus');
+            print('일치하는 번호들: $matchedNumbers');
+
+            // 등수 결정
+            int rank = 0;
+            int prize = 0;
+
+            if (matchCount == 6) {
+              rank = 1;
+              prize = 2000000000; // 20억
+              print('1등 당첨!');
+            } else if (matchCount == 5 && hasBonus) {
+              rank = 2;
+              prize = 50000000; // 5천만원
+              print('2등 당첨!');
+            } else if (matchCount == 5) {
+              rank = 3;
+              prize = 1500000; // 150만원
+              print('3등 당첨!');
+            } else if (matchCount == 4) {
+              rank = 4;
+              prize = 50000; // 5만원
+              print('4등 당첨!');
+            } else if (matchCount == 3) {
+              rank = 5;
+              prize = 5000; // 5천원
+              print('5등 당첨!');
+            } else {
+              print('당첨 안됨: 일치하는 번호가 ${matchCount}개');
+            }
+
+            // 당첨된 경우
+            if (rank > 0) {
+              final result = {
+                'rank': rank,
+                'prize': prize,
+                'numbers': ticketNumbers,
+                'matched_numbers': matchedNumbers,
+                'purchase_date': ticket['issue_date'],
+              };
+              allResults.add(result);
+
+              // 디버깅 로그
+              print('당첨 발견! 등수: $rank, 번호: ${ticketNumbers.join(", ")}');
+              print('일치하는 번호: ${matchedNumbers.join(", ")}');
+            }
+          }
+        } catch (e) {
+          print('티켓 확인 오류: $e');
+          print('스택 트레이스: ${e.toString()}');
+        }
+      }
+    }
+
+    // 테스트 결과 출력
+    print('티켓 처리 여부: ${processedAnyTicket ? "예" : "아니오"}');
+    print('로또 행 처리 여부: ${processedAnyRow ? "예" : "아니오"}');
+
+    // 데이터베이스에서 티켓을 제대로 가져왔는지 확인
+    if (!processedAnyTicket) {
+      print('경고: 데이터베이스에서 티켓을 가져오지 못했습니다.');
+    } else if (!processedAnyRow) {
+      print('경고: 티켓을 가져왔지만 로또 행이 없습니다.');
+    }
+
+    // 디버깅: 당첨 결과 출력
+    print('총 당첨 수: ${allResults.length}');
+    for (var result in allResults) {
+      print(
+          '당첨 등수: ${result['rank']}등, 번호: ${(result['numbers'] as List<int>).join(", ")}');
+      print('일치하는 번호: ${(result['matched_numbers'] as List<int>).join(", ")}');
+    }
 
     // 당첨 결과 업데이트
-    winningResults.assignAll(results);
+    winningResults.clear(); // 기존 결과 초기화
+    winningResults.assignAll(allResults);
 
     // 모든 당첨 결과에 추가
-    if (results.isNotEmpty) {
-      allWinningResults.addAll(results);
+    if (allResults.isNotEmpty) {
+      allWinningResults.addAll(allResults);
+      print('모든 당첨 결과에 ${allResults.length}개 항목 추가됨');
     }
 
     // 당첨금 추가
     int totalPrize = 0;
-    for (var result in results) {
+    for (var result in allResults) {
       totalPrize += result['prize'] as int;
     }
 
@@ -230,17 +428,15 @@ class LottoTicketController extends GetxController {
     if (totalPrize > 0) {
       seedMoney.value += totalPrize;
 
-      // 당첨 알림
-      Get.snackbar(
-        '당첨 알림',
-        '총 ${results.length}개의 당첨이 있습니다. 당첨금: ₩${totalPrize.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-        backgroundColor: Colors.amber.shade100,
-        duration: const Duration(seconds: 3),
-        animationDuration: const Duration(milliseconds: 0),
-        snackPosition: SnackPosition.TOP,
-        margin: const EdgeInsets.all(8),
-      );
+      // 대신 콘솔 출력
+      print(
+          '당첨 알림: 총 ${allResults.length}개 당첨, 당첨금: ₩${_formatCurrency(totalPrize)}');
+    } else {
+      // 당첨 결과가 없을 때도 알림 추가 (디버깅)
+      print('당첨 결과가 없습니다. 확인이 필요합니다.');
     }
+
+    print('===== 당첨 번호 확인 종료 =====');
   }
 
   // 빈 티켓 추가 (내부 메소드)
@@ -263,8 +459,14 @@ class LottoTicketController extends GetxController {
 
   // 로또 구매 시도
   Future<void> tryPurchaseTickets() async {
-    // 이미 구매 완료된 경우
-    if (purchaseCompleted.value) {
+    // 버튼 비활성화 상태면 무시
+    if (isButtonDisabled.value) return;
+
+    // 버튼 일시 비활성화
+    _disableButtonTemporarily();
+
+    // 이미 구매 완료된 경우 (토요일이 아닌 경우에만 체크)
+    if (purchaseCompleted.value && !isDrawDay.value) {
       Get.snackbar(
         '구매 완료',
         '이미 오늘의 구매를 완료했습니다. 다음 날로 이동하세요.',
@@ -305,6 +507,19 @@ class LottoTicketController extends GetxController {
       return;
     }
 
+    // 하루 구매 한도 초과
+    if (totalAmount > dailyPurchaseLimit) {
+      Get.snackbar(
+        '구매 한도 초과',
+        '하루 최대 구매 한도는 10만원입니다.',
+        backgroundColor: Colors.red.shade100,
+        duration: const Duration(seconds: 2),
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(8),
+      );
+      return;
+    }
+
     // 잔액 부족
     if (totalAmount > seedMoney.value) {
       Get.snackbar(
@@ -328,61 +543,45 @@ class LottoTicketController extends GetxController {
     // 구매한 티켓 저장
     await _savePurchasedTickets();
 
-    // 토요일에 구매한 경우
-    if (isDrawDay.value) {
-      // 이미 다이얼로그가 표시 중인지 확인 (중복 방지)
-      if (Get.isDialogOpen ?? false) {
-        return;
-      }
+    // 토요일인지 확인
+    final isCurrentlySaturday = isCurrentDateDrawDay();
 
-      // 토요일인 경우 checkDrawResults()만 호출하고
-      // moveToNextDay()는 호출하지 않음 (중복 다이얼로그 방지)
+    // 추첨결과 확인 (토요일인 경우)
+    if (isCurrentlySaturday) {
       await checkDrawResults();
-      // 결과 다이얼로그 표시 상태로 설정
-      shouldShowResult.value = true;
-      _showResultDialogAfterDelay(); // 다이얼로그는 표시
+      // 결과 다이얼로그를 표시하고 닫기 버튼을 누르면 다음날로 이동
+      _showResultDialogWithNextDay();
     } else {
       // 토요일이 아닌 경우 바로 다음 날로 이동
-      await moveToNextDay();
+      await actuallyMoveToNextDay();
     }
 
     // 게임 상태 저장
     await _saveGameState();
   }
 
-  // 이번 회차 구매한 티켓 수 조회 (일요일부터 토요일까지)
-  Future<int> getCurrentRoundTicketCount() async {
-    try {
-      // 이번 회차 추첨일(토요일)
-      final drawDate = currentDate.value;
-      // 이번 회차 시작일(이전 일요일)
-      final startDate = DateTime(
-          drawDate.year, drawDate.month, drawDate.day - 6 // 일요일은 토요일로부터 6일 전
-          );
-
-      // 이번 회차에 해당하는 모든 티켓 조회 (일요일~토요일)
-      final tickets = await _dbService.getAllTicketsForDrawDate(drawDate);
-
-      // 이전 주 일요일에 구매한 티켓도 조회 (이번 회차에 포함)
-      final sundayTickets = await _dbService.getTicketsOnDate(startDate);
-
-      return tickets.length + sundayTickets.length;
-    } catch (e) {
-      print('회차 티켓 수 조회 오류: $e');
-      return 0;
+  // 결과 다이얼로그를 표시하고 닫기 버튼 누르면 다음날로 이동하는 함수
+  void _showResultDialogWithNextDay() {
+    // 이미 다이얼로그가 열려있는 경우 중복 표시 방지
+    if (Get.isDialogOpen ?? false) {
+      return;
     }
-  }
 
-  // 지연 후 결과 다이얼로그를 표시하는 함수
-  void _showResultDialogAfterDelay() {
-    Future.delayed(const Duration(milliseconds: 300), () async {
-      // Get.isDialogOpen을 확인하여 이미 다이얼로그가 열려있는 경우 중복 표시 방지
+    Future.delayed(const Duration(milliseconds: 10), () async {
+      // 한번 더 체크
       if (Get.isDialogOpen ?? false) {
         return;
       }
 
       // 이번 회차 구매한 티켓 수 조회
       final ticketCount = await getCurrentRoundTicketCount();
+
+      // 당첨금 직접 계산
+      final calculatedPrizes = _prizeCalculatorService.calculatePrizes();
+
+      // 디버깅 로그 추가
+      print('계산된 당첨금: $calculatedPrizes');
+      print('당첨 결과 개수: ${winningResults.length}');
 
       // 당첨 결과를 등수별로 그룹화
       final Map<int, List<Map<String, dynamic>>> groupedResults = {};
@@ -405,6 +604,8 @@ class LottoTicketController extends GetxController {
               style: TextStyle(fontWeight: FontWeight.bold)),
           content: Container(
             width: double.maxFinite,
+            constraints:
+                BoxConstraints(maxHeight: Get.height * 0.7), // 다이얼로그 최대 높이 설정
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -446,10 +647,10 @@ class LottoTicketController extends GetxController {
                             // 등수와 총 당첨금 표시
                             Text(
                               '$rank등: ${resultsForRank.length}개 - ₩${totalPrizeForRank.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: rank <= 3 ? Colors.red : Colors.black,
+                                color: Colors.black, // 빨간색 강조 제거
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -457,6 +658,10 @@ class LottoTicketController extends GetxController {
                             // 각 당첨 번호와 구매 날짜 표시
                             ...resultsForRank.map((result) {
                               final numbers = List<int>.from(result['numbers']);
+                              final matchedNumbers = result
+                                      .containsKey('matched_numbers')
+                                  ? List<int>.from(result['matched_numbers'])
+                                  : <int>[];
                               final purchaseDate =
                                   result['purchase_date'] != null
                                       ? DateTime.parse(
@@ -469,17 +674,31 @@ class LottoTicketController extends GetxController {
                               return Padding(
                                 padding: const EdgeInsets.only(
                                     bottom: 4.0, left: 8.0),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Text('${numbers.join(', ')}'),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text('${numbers.join(', ')}'),
+                                        ),
+                                        if (purchaseDateStr.isNotEmpty)
+                                          Text(
+                                            purchaseDateStr,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                      ],
                                     ),
-                                    if (purchaseDateStr.isNotEmpty)
+                                    if (matchedNumbers.isNotEmpty)
                                       Text(
-                                        purchaseDateStr,
+                                        '일치: ${matchedNumbers.join(', ')}',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey[600],
+                                          color: Colors.green[800],
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                   ],
@@ -505,6 +724,30 @@ class LottoTicketController extends GetxController {
                       ),
                     ),
                   ),
+
+                  // 이번 회차 당첨금액 정보 추가 - 직접 계산한 값 사용
+                  const SizedBox(height: 20),
+                  Text(
+                    '1등: ₩${_formatCurrency(calculatedPrizes[1] ?? 0)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    '2등: ₩${_formatCurrency(calculatedPrizes[2] ?? 0)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    '3등: ₩${_formatCurrency(calculatedPrizes[3] ?? 0)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -513,16 +756,22 @@ class LottoTicketController extends GetxController {
             TextButton(
               onPressed: () {
                 Get.back(); // 다이얼로그 닫기
-                // 다음 날로 이동
+                // 다이얼로그를 닫은 후 다음 날로 이동
                 actuallyMoveToNextDay();
               },
-              child: const Text('다음 날로 이동'),
+              child: const Text('닫기'),
             ),
           ],
         ),
         barrierDismissible: false, // 바깥쪽 터치로 닫히지 않도록 설정
       );
     });
+  }
+
+  // 숫자를 통화 형식으로 포맷팅 (1000000 -> 1,000,000)
+  String _formatCurrency(int value) {
+    return value.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
   }
 
   // 로또 볼 위젯
@@ -648,9 +897,12 @@ class LottoTicketController extends GetxController {
       for (var ticket in tickets) {
         if (ticket.amount > 0) {
           // 금액이 있는 티켓만 저장 (선택된 번호가 있는 티켓)
+          print(
+              '저장할 티켓: ${ticket.lottoRows.map((row) => row.numbers).toList()}');
           await _dbService.savePurchasedTicket(currentDate.value, ticket);
         }
       }
+      print('티켓 저장 완료: ${tickets.length}장');
     } catch (e) {
       print('티켓 저장 오류: $e');
     }
@@ -801,6 +1053,29 @@ class LottoTicketController extends GetxController {
           );
         }
       }
+    }
+  }
+
+  // 이번 회차 구매한 티켓 수 조회 (일요일부터 토요일까지)
+  Future<int> getCurrentRoundTicketCount() async {
+    try {
+      // 이번 회차 추첨일(토요일)
+      final drawDate = currentDate.value;
+      // 이번 회차 시작일(이전 일요일)
+      final startDate = DateTime(
+          drawDate.year, drawDate.month, drawDate.day - 6 // 일요일은 토요일로부터 6일 전
+          );
+
+      // 이번 회차에 해당하는 모든 티켓 조회 (일요일~토요일)
+      final tickets = await _dbService.getAllTicketsForDrawDate(drawDate);
+
+      // 이전 주 일요일에 구매한 티켓도 조회 (이번 회차에 포함)
+      final sundayTickets = await _dbService.getTicketsOnDate(startDate);
+
+      return tickets.length + sundayTickets.length;
+    } catch (e) {
+      print('회차 티켓 수 조회 오류: $e');
+      return 0;
     }
   }
 }

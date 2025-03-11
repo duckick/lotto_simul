@@ -1,6 +1,8 @@
 import 'dart:math';
 import '../models/lotto_models.dart';
 import 'database_service.dart';
+import 'prize_calculator_service.dart';
+import 'prize_info_service.dart';
 
 class LottoDrawService {
   static final LottoDrawService _instance = LottoDrawService._internal();
@@ -10,12 +12,22 @@ class LottoDrawService {
 
   final _random = Random();
   final _dbService = DatabaseService.instance;
+  final _prizeCalculator = PrizeCalculatorService.instance;
+
+  // 현재 회차의 당첨금 정보
+  Map<int, int>? _currentRoundPrizes;
 
   // 로또 번호 추첨 (6개 번호 + 보너스 번호 1개)
   Future<Map<String, dynamic>> drawLottoNumbers(DateTime drawDate) async {
     // 이미 추첨된 결과가 있는지 확인
     final existingResult = await _dbService.getDrawResult(drawDate);
     if (existingResult != null) {
+      // 이미 추첨된 결과가 있어도 당첨금 정보를 로그로 출력
+      if (existingResult.containsKey('prizes')) {
+        _currentRoundPrizes =
+            Map<int, int>.from(existingResult['prizes'] as Map);
+        _logPrizeAmounts(drawDate);
+      }
       return existingResult;
     }
 
@@ -32,6 +44,12 @@ class LottoDrawService {
       bonusNumber = _random.nextInt(45) + 1;
     } while (selectedNumbers.contains(bonusNumber));
 
+    // 새로운 회차마다 당첨금 다시 계산
+    _currentRoundPrizes = _prizeCalculator.calculatePrizes();
+
+    // 추첨 결과 및 당첨금 로그 출력
+    _logPrizeAmounts(drawDate);
+
     // 추첨 결과 저장
     await _dbService.saveDrawResult(drawDate, selectedNumbers, bonusNumber);
 
@@ -39,7 +57,26 @@ class LottoDrawService {
       'draw_date': drawDate,
       'draw_numbers': selectedNumbers,
       'bonus_number': bonusNumber,
+      'prizes': _currentRoundPrizes,
     };
+  }
+
+  // 당첨금 정보를 콘솔에 로그로 출력
+  void _logPrizeAmounts(DateTime drawDate) {
+    if (_currentRoundPrizes == null) return;
+
+    final String dateStr =
+        '${drawDate.year}년 ${drawDate.month}월 ${drawDate.day}일';
+    print('\n========== 로또 추첨 결과 (${dateStr}) ==========');
+    print(
+        '1등 당첨금: ${PrizeInfoService.formatCurrency(_currentRoundPrizes![1] ?? 0)}원');
+    print(
+        '2등 당첨금: ${PrizeInfoService.formatCurrency(_currentRoundPrizes![2] ?? 0)}원');
+    print(
+        '3등 당첨금: ${PrizeInfoService.formatCurrency(_currentRoundPrizes![3] ?? 0)}원');
+    print('4등 당첨금: 50,000원');
+    print('5등 당첨금: 5,000원');
+    print('=============================================\n');
   }
 
   // 당첨 등수 확인
@@ -75,6 +112,16 @@ class LottoDrawService {
     final drawResult = await drawLottoNumbers(drawDate);
     final drawNumbers = List<int>.from(drawResult['draw_numbers']);
     final bonusNumber = drawResult['bonus_number'] as int;
+
+    // 당첨금 정보 업데이트
+    if (drawResult.containsKey('prizes')) {
+      _currentRoundPrizes = Map<int, int>.from(drawResult['prizes'] as Map);
+    } else {
+      // 기존 데이터에 당첨금 정보가 없는 경우 새로 계산
+      _currentRoundPrizes = _prizeCalculator.calculatePrizes();
+      // 당첨금 정보 로그 출력
+      _logPrizeAmounts(drawDate);
+    }
 
     // 해당 추첨일에 대한 미확인 티켓 가져오기
     final uncheckedTickets =
@@ -132,6 +179,16 @@ class LottoDrawService {
         final drawNumbers = List<int>.from(drawResult['draw_numbers']);
         final bonusNumber = drawResult['bonus_number'] as int;
 
+        // 현재 회차의 당첨금 정보 설정
+        if (drawResult.containsKey('prizes')) {
+          _currentRoundPrizes = Map<int, int>.from(drawResult['prizes'] as Map);
+        } else {
+          // 기존 데이터에 당첨금 정보가 없는 경우 새로 계산
+          _currentRoundPrizes = _prizeCalculator.calculatePrizes();
+          // 당첨금 정보 로그 출력
+          _logPrizeAmounts(drawDate);
+        }
+
         // 해당 추첨일에 대한 모든 티켓 가져오기 (이미 확인된 티켓 포함)
         final tickets = await _dbService.getAllTicketsForDrawDate(drawDate);
 
@@ -171,21 +228,14 @@ class LottoDrawService {
     }
   }
 
-  // 당첨금 계산 (실제 로또 당첨금은 회차마다 다르지만, 시뮬레이션을 위한 고정 금액)
+  // 당첨금 계산 (동적 계산)
   int _getPrizeAmount(int rank) {
-    switch (rank) {
-      case 1:
-        return 2000000000; // 20억원
-      case 2:
-        return 100000000; // 1억원
-      case 3:
-        return 1500000; // 150만원
-      case 4:
-        return 50000; // 5만원
-      case 5:
-        return 5000; // 5천원
-      default:
-        return 0;
+    // 회차별 당첨금 정보가 없는 경우 새로 계산
+    if (_currentRoundPrizes == null) {
+      _currentRoundPrizes = _prizeCalculator.calculatePrizes();
     }
+
+    // 현재 회차의 당첨금 반환
+    return _currentRoundPrizes![rank] ?? 0;
   }
 }

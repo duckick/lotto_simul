@@ -99,8 +99,8 @@ class _FloatingIconAnimationState extends State<FloatingIconAnimation>
       animation: _controller,
       builder: (context, child) {
         return Positioned(
-          left: widget.startPosition.dx + _positionAnimation.value.dx * 50,
-          top: widget.startPosition.dy + _positionAnimation.value.dy * 50,
+          left: widget.startPosition.dx + _positionAnimation.value.dx * 40,
+          top: widget.startPosition.dy + _positionAnimation.value.dy * 40,
           child: Opacity(
             opacity: _opacityAnimation.value,
             child: Transform.scale(
@@ -117,6 +117,8 @@ class _FloatingIconAnimationState extends State<FloatingIconAnimation>
     );
   }
 }
+
+/////////////////////////////////
 
 // 눌림 효과가 있는 버튼 위젯
 class PressableButton extends StatefulWidget {
@@ -167,6 +169,8 @@ class _PressableButtonState extends State<PressableButton> {
     );
   }
 }
+
+/////////////////////////////////////////////////////////////
 
 class PlayPage extends StatefulWidget {
   const PlayPage({Key? key}) : super(key: key);
@@ -601,6 +605,8 @@ class _PlayPageState extends State<PlayPage>
                                     controller.moveToNextDay();
                                   }
 
+                                  // 스낵바 주석 처리
+                                  /*
                                   Get.snackbar(
                                     '다음 날로 이동',
                                     '다음 날로 이동했습니다.',
@@ -612,6 +618,7 @@ class _PlayPageState extends State<PlayPage>
                                     snackPosition: SnackPosition.TOP,
                                     margin: const EdgeInsets.all(8),
                                   );
+                                  */
                                 }
                               },
                               child: ElevatedButton.icon(
