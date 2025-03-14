@@ -107,11 +107,18 @@ class LottoDrawService {
 
   // 특정 추첨일에 해당하는 모든 티켓의 당첨 여부 확인
   Future<List<Map<String, dynamic>>> checkAllTicketsForDrawDate(
-      DateTime drawDate) async {
-    // 추첨 결과 가져오기 (없으면 새로 추첨)
+      DateTime drawDate,
+      {int? currentRound,
+      List<LottoTicket>? includeTickets}) async {
+    // 디버그 로그 추가
+    print(
+        'LottoDrawService::checkAllTicketsForDrawDate - 날짜: $drawDate, 회차: $currentRound');
+
     final drawResult = await drawLottoNumbers(drawDate);
     final drawNumbers = List<int>.from(drawResult['draw_numbers']);
     final bonusNumber = drawResult['bonus_number'] as int;
+
+    print('추첨 번호: $drawNumbers, 보너스: $bonusNumber');
 
     // 당첨금 정보 업데이트
     if (drawResult.containsKey('prizes')) {
@@ -123,18 +130,24 @@ class LottoDrawService {
       _logPrizeAmounts(drawDate);
     }
 
-    // 해당 추첨일에 대한 미확인 티켓 가져오기
-    final uncheckedTickets =
-        await _dbService.getUncheckedTicketsForDrawDate(drawDate);
+    // 해당 추첨일과 회차에 대한 미확인 티켓 가져오기
+    final uncheckedTickets = await _dbService
+        .getUncheckedTicketsForDrawDate(drawDate, currentRound: currentRound);
+
+    print('DB에서 미확인 티켓 조회: ${uncheckedTickets.length}장');
 
     final results = <Map<String, dynamic>>[];
 
+    // 데이터베이스에서 가져온 티켓 처리
     for (var ticketMap in uncheckedTickets) {
       final ticketId = ticketMap['id'] as int;
       final ticketData = ticketMap['ticket_data'];
 
       // 티켓 데이터 파싱
       final ticket = LottoTicket.fromJson(ticketData);
+
+      print(
+          '티켓 확인 (DB) - ID: $ticketId, 회차: ${ticket.round}, 추첨일: ${ticket.drawDate}');
 
       // 각 로또 행에 대해 당첨 여부 확인
       for (var row in ticket.lottoRows) {
@@ -143,6 +156,7 @@ class LottoDrawService {
           final rank = checkWinningRank(row.numbers, drawNumbers, bonusNumber);
 
           if (rank > 0) {
+            print('당첨! 행: ${row.rowName}, 번호: ${row.numbers}, 등수: $rank');
             results.add({
               'ticket_id': ticketId,
               'row_name': row.rowName,
@@ -157,6 +171,37 @@ class LottoDrawService {
       // 티켓을 확인했음으로 표시
       await _dbService.updateTicketCheckedStatus(ticketId, true);
     }
+
+    // 메모리에서 방금 구매한 티켓도 당첨 확인에 포함
+    if (includeTickets != null && includeTickets.isNotEmpty) {
+      print('방금 구매한 티켓 포함: ${includeTickets.length}장');
+
+      for (var ticket in includeTickets) {
+        print('티켓 확인 (메모리) - 회차: ${ticket.round}, 추첨일: ${ticket.drawDate}');
+
+        // 각 로또 행에 대해 당첨 여부 확인
+        for (var row in ticket.lottoRows) {
+          // 선택된 번호가 있는 경우에만 확인
+          if (row.numbers.any((num) => num > 0)) {
+            final rank =
+                checkWinningRank(row.numbers, drawNumbers, bonusNumber);
+
+            if (rank > 0) {
+              print('당첨! 행: ${row.rowName}, 번호: ${row.numbers}, 등수: $rank');
+              results.add({
+                'ticket_id': -1, // 메모리에 있는 티켓이므로 임시 ID
+                'row_name': row.rowName,
+                'numbers': row.numbers,
+                'rank': rank,
+                'prize': _getPrizeAmount(rank),
+              });
+            }
+          }
+        }
+      }
+    }
+
+    print('최종 당첨 결과: ${results.length}개');
 
     return results;
   }
@@ -189,7 +234,8 @@ class LottoDrawService {
           _logPrizeAmounts(drawDate);
         }
 
-        // 해당 추첨일에 대한 모든 티켓 가져오기 (이미 확인된 티켓 포함)
+        // 이 추첨일에 해당하는 모든 회차의 티켓 확인을 위해 currentRound를 null로 설정
+        // 이는 데이터베이스에서 회차 정보를 추출하지 않았기 때문입니다
         final tickets = await _dbService.getAllTicketsForDrawDate(drawDate);
 
         for (var ticketMap in tickets) {
@@ -214,6 +260,7 @@ class LottoDrawService {
                   'rank': rank,
                   'prize': _getPrizeAmount(rank),
                   'draw_date': drawDate,
+                  'round': ticket.round, // round 정보 추가
                 });
               }
             }

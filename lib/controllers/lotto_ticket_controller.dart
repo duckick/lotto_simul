@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../services/lotto_draw_service.dart';
 import '../services/prize_calculator_service.dart';
+import 'dart:convert';
 
 class LottoTicketController extends GetxController {
   final currentDate = DateTime.now().obs;
@@ -198,17 +199,30 @@ class LottoTicketController extends GetxController {
   }
 
   // 추첨 결과 확인
-  Future<void> checkDrawResults() async {
+  Future<void> checkDrawResults({List<LottoTicket>? includeTickets}) async {
     // 현재 날짜가 추첨일이 아니면 무시
     if (!isCurrentDateDrawDay()) return;
 
     try {
+      // 디버그 로그 추가
+      print('===========================================================');
+      print('추첨 시작 - 회차: ${currentRound.value}, 날짜: ${currentDate.value}');
+      if (includeTickets != null) {
+        print('방금 구매한 티켓 포함: ${includeTickets.length}장');
+        for (var ticket in includeTickets) {
+          print(
+              '티켓 회차: ${ticket.round}, 발행일: ${ticket.issueDate}, 추첨일: ${ticket.drawDate}');
+        }
+      }
+
       // 당첨 결과 초기화
       winningResults.clear();
 
-      // 로또 번호 추첨 및 당첨 확인 서비스 호출
-      final results =
-          await _drawService.checkAllTicketsForDrawDate(currentDate.value);
+      // 로또 번호 추첨 및 당첨 확인 서비스 호출 (현재 회차 정보 전달)
+      final results = await _drawService.checkAllTicketsForDrawDate(
+          currentDate.value,
+          currentRound: currentRound.value,
+          includeTickets: includeTickets);
 
       // 추첨 결과 업데이트 (당첨 정보 저장)
       final drawResult = await _drawService.drawLottoNumbers(currentDate.value);
@@ -232,6 +246,7 @@ class LottoTicketController extends GetxController {
             'numbers': result['numbers'],
             'matched_numbers': matchedNumbers,
             'purchase_date': currentDate.value.toString(),
+            'round': currentRound.value, // 회차 정보 추가
           });
         }
 
@@ -243,7 +258,13 @@ class LottoTicketController extends GetxController {
 
         // 잔액에 당첨금 추가
         seedMoney.value += totalWinnings;
+
+        // 디버그 로그 추가
+        print('당첨결과: ${winningResults.length}개, 총 당첨금: ${totalWinnings}원');
+      } else {
+        print('당첨된 티켓이 없습니다.');
       }
+      print('===========================================================');
 
       // 결과 팝업 표시
       shouldShowResult.value = true;
@@ -255,7 +276,7 @@ class LottoTicketController extends GetxController {
   // 빈 티켓 추가 (내부 메소드)
   void _addEmptyTicket() {
     tickets.add(LottoTicket(
-      round: 1,
+      round: currentRound.value,
       issueDate: currentDate.value,
       drawDate: getNextDrawDate(),
       lottoRows: List.generate(
@@ -353,15 +374,24 @@ class LottoTicketController extends GetxController {
     // 구매 완료 상태로 변경
     purchaseCompleted.value = true;
 
+    // 현재 티켓의 복사본 보관 (추첨에 포함시키기 위함)
+    final currentTickets = List<LottoTicket>.from(tickets);
+
     // 구매한 티켓 저장
     await _savePurchasedTickets();
 
     // 토요일인지 확인
     final isCurrentlySaturday = isCurrentDateDrawDay();
 
-    // 추첨결과 확인 (토요일인 경우)
+    // 토요일에 구매한 경우
     if (isCurrentlySaturday) {
-      await checkDrawResults();
+      // 당첨 결과 확인 전에 현재 구매한 티켓을 메모리에 보관
+      final purchasedTickets =
+          currentTickets.where((ticket) => ticket.amount > 0).toList();
+
+      // 당첨 결과 확인
+      await checkDrawResults(includeTickets: purchasedTickets);
+
       // 결과 다이얼로그를 표시하고 닫기 버튼을 누르면 다음날로 이동
       _showResultDialogWithNextDay();
     } else {
@@ -866,12 +896,27 @@ class LottoTicketController extends GetxController {
           );
 
       // 이번 회차에 해당하는 모든 티켓 조회 (일요일~토요일)
-      final tickets = await _dbService.getAllTicketsForDrawDate(drawDate);
+      final tickets = await _dbService.getAllTicketsForDrawDate(drawDate,
+          currentRound: currentRound.value);
 
       // 이전 주 일요일에 구매한 티켓도 조회 (이번 회차에 포함)
       final sundayTickets = await _dbService.getTicketsOnDate(startDate);
 
-      return tickets.length + sundayTickets.length;
+      // 일요일 티켓 중 현재 회차에 해당하는 티켓만 필터링
+      final validSundayTickets = <Map<String, dynamic>>[];
+      for (var ticket in sundayTickets) {
+        try {
+          final ticketData = jsonDecode(ticket['ticket_data'] as String);
+          final ticketRound = ticketData['round'] as int;
+          if (ticketRound == currentRound.value) {
+            validSundayTickets.add(ticket);
+          }
+        } catch (e) {
+          print('티켓 데이터 파싱 오류: $e');
+        }
+      }
+
+      return tickets.length + validSundayTickets.length;
     } catch (e) {
       print('회차 티켓 수 조회 오류: $e');
       return 0;

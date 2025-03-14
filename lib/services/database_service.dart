@@ -241,9 +241,10 @@ class DatabaseService {
     };
   }
 
-  // 아직 확인하지 않은 티켓 중 특정 추첨일에 해당하는 티켓 조회
+  // 아직 확인하지 않은 티켓 중 특정 추첨일과 회차에 해당하는 티켓 조회
   Future<List<Map<String, dynamic>>> getUncheckedTicketsForDrawDate(
-      DateTime drawDate) async {
+      DateTime drawDate,
+      {int? currentRound}) async {
     final db = await database;
 
     // 먼저 확인하지 않은 모든 티켓을 가져옵니다
@@ -258,8 +259,17 @@ class DatabaseService {
       try {
         final ticketData = jsonDecode(ticketMap['ticket_data'] as String);
         final ticketDrawDate = ticketData['drawDate'] as String;
+        final ticketRound = ticketData['round'] as int;
+
         // 날짜가 동일한 날인지 확인 (시간은 무시하고 날짜만 비교)
-        return ticketDrawDate.split('T')[0] == targetDrawDateStr.split('T')[0];
+        final isDateMatched =
+            ticketDrawDate.split('T')[0] == targetDrawDateStr.split('T')[0];
+
+        // 회차 확인이 필요한 경우에만 회차도 체크
+        final isRoundMatched =
+            currentRound == null || ticketRound == currentRound;
+
+        return isDateMatched && isRoundMatched;
       } catch (e) {
         print('티켓 데이터 파싱 오류: $e');
         return false;
@@ -296,9 +306,9 @@ class DatabaseService {
     });
   }
 
-  // 특정 추첨일에 해당하는 모든 티켓 조회 (확인 여부 상관없이)
-  Future<List<Map<String, dynamic>>> getAllTicketsForDrawDate(
-      DateTime drawDate) async {
+  // 특정 추첨일과 회차에 해당하는 모든 티켓 조회 (확인 여부 상관없이)
+  Future<List<Map<String, dynamic>>> getAllTicketsForDrawDate(DateTime drawDate,
+      {int? currentRound}) async {
     final db = await database;
 
     // 모든 티켓을 가져옵니다
@@ -310,8 +320,17 @@ class DatabaseService {
       try {
         final ticketData = jsonDecode(ticketMap['ticket_data'] as String);
         final ticketDrawDate = ticketData['drawDate'] as String;
+        final ticketRound = ticketData['round'] as int;
+
         // 날짜가 동일한 날인지 확인 (시간은 무시하고 날짜만 비교)
-        return ticketDrawDate.split('T')[0] == targetDrawDateStr.split('T')[0];
+        final isDateMatched =
+            ticketDrawDate.split('T')[0] == targetDrawDateStr.split('T')[0];
+
+        // 회차 확인이 필요한 경우에만 회차도 체크
+        final isRoundMatched =
+            currentRound == null || ticketRound == currentRound;
+
+        return isDateMatched && isRoundMatched;
       } catch (e) {
         print('티켓 데이터 파싱 오류: $e');
         return false;
