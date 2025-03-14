@@ -123,6 +123,9 @@ class LottoTicketController extends GetxController {
     // 구매 완료 상태 초기화 (더 이상 사용하지 않지만 호환성을 위해 유지)
     purchaseCompleted.value = false;
 
+    // 애니메이션 효과를 위한 지연 제거
+    // await Future.delayed(const Duration(milliseconds: 50));
+
     // 티켓 목록 초기화하되, 같은 수의 빈 티켓 생성
     tickets.clear();
 
@@ -163,6 +166,9 @@ class LottoTicketController extends GetxController {
 
     // 구매 완료 상태 초기화
     purchaseCompleted.value = false;
+
+    // 애니메이션 효과를 위한 지연 제거
+    // await Future.delayed(const Duration(milliseconds: 50));
 
     // 티켓 목록 초기화하되, 같은 수의 빈 티켓 생성
     final currentTicketCount = tickets.length;

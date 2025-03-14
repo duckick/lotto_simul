@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
+import 'package:animations/animations.dart';
 import '../controllers/lotto_ticket_controller.dart';
 import '../widgets/mini_lotto_ticket_widget.dart';
 
@@ -184,6 +185,15 @@ class _PlayPageState extends State<PlayPage>
   final List<FloatingIconAnimation> _floatingIcons = [];
   final GlobalKey _purchaseButtonKey = GlobalKey();
 
+  // 이전 날짜를 저장할 변수 추가
+  DateTime? _previousDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousDate = Get.find<LottoTicketController>().currentDate.value;
+  }
+
   // 구매하기 버튼의 위치를 얻는 메서드
   Offset _getPurchaseButtonPosition() {
     final renderBox =
@@ -299,9 +309,80 @@ class _PlayPageState extends State<PlayPage>
     return 5; // 20장 이하 (최대)
   }
 
+  // 커스텀 슬라이드 애니메이션 위젯
+  Widget _buildSlidingGridView(LottoTicketController controller) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        // 새 위젯이 들어올 때는 오른쪽에서, 나갈 때는 왼쪽으로
+        final inAnimation = Tween<Offset>(
+          begin: const Offset(1.0, 0.0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOut,
+        ));
+
+        final outAnimation = Tween<Offset>(
+          begin: Offset.zero,
+          end: const Offset(-1.0, 0.0),
+        ).animate(CurvedAnimation(
+          parent: ReverseAnimation(animation),
+          curve: Curves.easeOut,
+        ));
+
+        if (child.key ==
+            ValueKey<String>(controller.currentDate.value.toString())) {
+          // 새 위젯이 들어올 때
+          return ClipRect(
+            child: SlideTransition(
+              position: inAnimation,
+              child: child,
+            ),
+          );
+        } else {
+          // 기존 위젯이 나갈 때
+          return ClipRect(
+            child: SlideTransition(
+              position: outAnimation,
+              child: child,
+            ),
+          );
+        }
+      },
+      layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+        return Stack(
+          children: <Widget>[
+            ...previousChildren,
+            if (currentChild != null) currentChild,
+          ],
+          alignment: Alignment.center,
+        );
+      },
+      child: Container(
+        key: ValueKey<String>(controller.currentDate.value.toString()),
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.8,
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 6,
+          ),
+          itemCount: controller.tickets.length,
+          itemBuilder: (context, index) {
+            return MiniLottoTicketWidget(index: index);
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<LottoTicketController>();
+
+    // 날짜 저장 (날짜 변경 감지용)
+    _previousDate = controller.currentDate.value;
 
     return WillPopScope(
       onWillPop: () async {
@@ -501,19 +582,8 @@ class _PlayPageState extends State<PlayPage>
                           );
                         }
 
-                        return GridView.builder(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 1.8,
-                            crossAxisSpacing: 6,
-                            mainAxisSpacing: 6,
-                          ),
-                          itemCount: controller.tickets.length,
-                          itemBuilder: (context, index) {
-                            return MiniLottoTicketWidget(index: index);
-                          },
-                        );
+                        // 슬라이드 애니메이션 위젯 사용
+                        return _buildSlidingGridView(controller);
                       }),
                     ),
                   ),
