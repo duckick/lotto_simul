@@ -525,6 +525,7 @@ class LottoTicketController extends GetxController {
                                           ),
                                       ],
                                     ),
+                                    // 일치 번호 표시 주석 처리
                                     // if (matchedNumbers.isNotEmpty)
                                     //   Text(
                                     //     '일치: ${matchedNumbers.join(', ')}',
