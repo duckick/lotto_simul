@@ -88,6 +88,14 @@ class ResultPage extends StatelessWidget {
                         color: Colors.blue.shade600,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      controller.getCurrentRoundString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ],
                 ),
               ),

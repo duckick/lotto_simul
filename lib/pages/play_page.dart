@@ -317,7 +317,7 @@ class _PlayPageState extends State<PlayPage>
                 children: [
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       border: Border(
@@ -331,12 +331,26 @@ class _PlayPageState extends State<PlayPage>
                       children: [
                         Obx(() {
                           final date = controller.currentDate.value;
-                          return Text(
-                            '${DateFormat('yyyy년 MM월 dd일').format(date)} (${_getKoreanWeekday(date)})',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${DateFormat('yyyy년 MM월 dd일').format(date)} (${_getKoreanWeekday(date)})',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              //일반회차
+                              // Text(
+                              //   controller.getCurrentRoundString(),
+                              //   style: TextStyle(
+                              //     fontSize: 12,
+                              //     color: Colors.grey,
+                              //   ),
+                              // ),
+                            ],
                           );
                         }),
                         Row(
@@ -476,7 +490,7 @@ class _PlayPageState extends State<PlayPage>
                     ),
                   ),
 
-                  // 미니 로또 티켓 그리드
+                  // 미니 로또 티켓 그리드(미니로또 위젯 배치됨)
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),

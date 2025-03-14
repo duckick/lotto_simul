@@ -62,6 +62,7 @@ class DatabaseService {
         draw_numbers TEXT,
         bonus_number INTEGER,
         total_spent INTEGER,
+        current_round INTEGER DEFAULT 1,
         last_updated TEXT
       )
     ''');
@@ -87,21 +88,31 @@ class DatabaseService {
             draw_numbers TEXT,
             bonus_number INTEGER,
             total_spent INTEGER,
+            current_round INTEGER DEFAULT 1,
             last_updated TEXT
           )
         ''');
         print('게임 상태 테이블이 생성되었습니다.');
       } else {
-        // 테이블이 있지만 total_spent 컬럼이 없는지 확인
+        // 테이블이 있지만 필요한 컬럼이 없는지 확인
         final columns = await db.rawQuery("PRAGMA table_info(game_state)");
         final hasTotalSpent =
             columns.any((column) => column['name'] == 'total_spent');
+        final hasCurrentRound =
+            columns.any((column) => column['name'] == 'current_round');
 
         if (!hasTotalSpent) {
           print('게임 상태 테이블에 total_spent 컬럼이 없습니다. 추가합니다.');
           await db.execute(
               'ALTER TABLE game_state ADD COLUMN total_spent INTEGER DEFAULT 0');
           print('total_spent 컬럼이 추가되었습니다.');
+        }
+
+        if (!hasCurrentRound) {
+          print('게임 상태 테이블에 current_round 컬럼이 없습니다. 추가합니다.');
+          await db.execute(
+              'ALTER TABLE game_state ADD COLUMN current_round INTEGER DEFAULT 1');
+          print('current_round 컬럼이 추가되었습니다.');
         }
 
         print('게임 상태 테이블이 이미 존재합니다.');
@@ -336,6 +347,7 @@ class DatabaseService {
     required List<int> drawNumbers,
     required int bonusNumber,
     required int totalSpent,
+    required int currentRound,
   }) async {
     final db = await database;
 
@@ -351,30 +363,50 @@ class DatabaseService {
       'draw_numbers': jsonEncode(drawNumbers),
       'bonus_number': bonusNumber,
       'total_spent': totalSpent,
+      'current_round': currentRound,
       'last_updated': DateTime.now().toIso8601String(),
     };
 
     try {
-      // 기존 레코드가 있는지 확인
-      final count = Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM game_state WHERE id = 1'));
-
-      if (count != null && count > 0) {
-        // 기존 레코드 업데이트
-        await db.update(
+      // 트랜잭션 사용으로 변경
+      await db.transaction((txn) async {
+        // 기존 레코드가 있는지 확인
+        final List<Map<String, dynamic>> result = await txn.query(
           'game_state',
-          gameState,
           where: 'id = 1',
         );
-      } else {
-        // 새 레코드 삽입
-        await db.insert('game_state', gameState);
-      }
 
-      print('게임 상태가 성공적으로 저장되었습니다.');
+        if (result.isNotEmpty) {
+          // 기존 레코드 업데이트
+          await txn.update(
+            'game_state',
+            gameState,
+            where: 'id = 1',
+          );
+          print('게임 상태 업데이트 완료');
+        } else {
+          // 새 레코드 삽입
+          await txn.insert('game_state', gameState);
+          print('게임 상태 새로 저장 완료');
+        }
+      });
     } catch (e) {
       print('게임 상태 저장 오류: $e');
-      throw e;
+
+      // 오류 발생 시 세부 정보 출력
+      print(
+          '저장 중인 데이터: currentDate=${currentDate.toIso8601String()}, seedMoney=$seedMoney, tickets 개수=${tickets.length}, currentRound=$currentRound');
+
+      // 재시도 로직 - 오류가 발생해도 강제로 업데이트 시도
+      try {
+        print('재시도: 기존 데이터 삭제 후 저장 시도');
+        await db.delete('game_state', where: 'id = 1');
+        await db.insert('game_state', gameState);
+        print('재시도 성공: 게임 상태 저장 완료');
+      } catch (e2) {
+        print('재시도 오류: $e2');
+        throw e2;
+      }
     }
   }
 
@@ -403,6 +435,9 @@ class DatabaseService {
         // total_spent 필드가 없는 경우 기본값 0 사용
         final totalSpent = data['total_spent'] ?? 0;
 
+        // current_round 필드가 없는 경우 기본값 1 사용
+        final currentRound = data['current_round'] ?? 1;
+
         return {
           'current_date': DateTime.parse(data['current_date'] as String),
           'seed_money': data['seed_money'] as int,
@@ -411,6 +446,7 @@ class DatabaseService {
           'draw_numbers': drawNumbers,
           'bonus_number': data['bonus_number'] as int,
           'total_spent': totalSpent,
+          'current_round': currentRound,
           'last_updated': DateTime.parse(data['last_updated'] as String),
         };
       }

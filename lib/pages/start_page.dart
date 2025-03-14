@@ -271,6 +271,7 @@ class StartPage extends StatelessWidget {
       controller.bonusNumber.value = 0;
 
       controller.currentDate.value = DateTime.now();
+      controller.currentRound.value = 1;
 
       controller.tickets.clear();
       controller.addNewTicket();

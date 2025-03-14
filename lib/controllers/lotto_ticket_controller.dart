@@ -11,6 +11,9 @@ class LottoTicketController extends GetxController {
   final dailyPurchaseLimit = 100000; // 하루 최대 구매 한도 (10만원)
   final tickets = <LottoTicket>[].obs;
 
+  // 회차 관련 변수 추가
+  final currentRound = 1.obs; // 현재 회차
+
   // 당첨 결과 관련 변수
   final winningResults = <Map<String, dynamic>>[].obs;
   final allWinningResults = <Map<String, dynamic>>[].obs; // 모든 당첨 결과를 저장하는 변수
@@ -49,6 +52,11 @@ class LottoTicketController extends GetxController {
     final daysUntilSaturday = weekday == 6 ? 7 : 6 - weekday;
     // 다음 토요일 날짜 반환
     return DateTime(date.year, date.month, date.day + daysUntilSaturday);
+  }
+
+  // 현재 회차 문자열 반환 (예: "1회차")
+  String getCurrentRoundString() {
+    return "${currentRound.value}회차";
   }
 
   // 오늘 구매한 총 금액
@@ -105,6 +113,12 @@ class LottoTicketController extends GetxController {
 
     // 날짜 변경 - 딜레이 없이 즉시 변경
     currentDate.value = currentDate.value.add(const Duration(days: 1));
+
+    // 토요일이 지난 후 일요일로 넘어갈 때 새로운 회차 시작
+    if (currentDate.value.weekday == 7) {
+      // 일요일
+      currentRound.value += 1;
+    }
 
     // 구매 완료 상태 초기화 (더 이상 사용하지 않지만 호환성을 위해 유지)
     purchaseCompleted.value = false;
@@ -182,10 +196,6 @@ class LottoTicketController extends GetxController {
     // 현재 날짜가 추첨일이 아니면 무시
     if (!isCurrentDateDrawDay()) return;
 
-    // 디버깅 로그
-    print('===== 당첨 번호 확인 시작 =====');
-    print('추첨일: ${currentDate.value.toString().substring(0, 10)}');
-
     try {
       // 당첨 결과 초기화
       winningResults.clear();
@@ -198,10 +208,6 @@ class LottoTicketController extends GetxController {
       final drawResult = await _drawService.drawLottoNumbers(currentDate.value);
       drawNumbers.assignAll(List<int>.from(drawResult['draw_numbers']));
       bonusNumber.value = drawResult['bonus_number'] as int;
-
-      // 디버깅: 추첨 번호 출력
-      print('추첨 번호: ${drawNumbers.join(', ')} + ${bonusNumber.value}');
-      print('당첨 결과 개수: ${results.length}');
 
       // 당첨된 티켓을 결과 배열에 추가
       if (results.isNotEmpty) {
@@ -223,8 +229,6 @@ class LottoTicketController extends GetxController {
           });
         }
 
-        print('당첨 정보: $winningResults');
-
         // 당첨 금액 합산
         int totalWinnings = 0;
         for (var result in winningResults) {
@@ -233,9 +237,6 @@ class LottoTicketController extends GetxController {
 
         // 잔액에 당첨금 추가
         seedMoney.value += totalWinnings;
-        print('총 당첨금: $totalWinnings원');
-      } else {
-        print('당첨된 티켓이 없습니다.');
       }
 
       // 결과 팝업 표시
@@ -243,8 +244,6 @@ class LottoTicketController extends GetxController {
     } catch (e) {
       print('당첨 번호 확인 오류: $e');
     }
-
-    print('===== 당첨 번호 확인 종료 =====');
   }
 
   // 빈 티켓 추가 (내부 메소드)
@@ -387,35 +386,6 @@ class LottoTicketController extends GetxController {
       // 당첨금 직접 계산
       final calculatedPrizes = _prizeCalculatorService.calculatePrizes();
 
-      // 디버깅 로그 추가
-      print('계산된 당첨금: $calculatedPrizes');
-      print('당첨 결과 개수: ${winningResults.length}');
-
-      // 테스트용: 당첨 결과가 없으면 임시 데이터 생성 (테스트 후에 제거)
-      if (winningResults.isEmpty && drawNumbers.isNotEmpty && ticketCount > 0) {
-        print('테스트: 당첨 결과가 없어 테스트 데이터 생성');
-
-        // 5등 당첨 (3개 번호 일치) 가정
-        final testNumbers = List<int>.from([1, 2, 3, 41, 42, 43]); // 임의의 번호
-        final matchedNumbers =
-            List<int>.from(drawNumbers.take(3)); // 첫 3개 번호가 일치한다고 가정
-
-        // 테스트 당첨 결과 추가
-        final testResult = {
-          'rank': 5, // 5등
-          'prize': 5000, // 5천원
-          'numbers': testNumbers,
-          'matched_numbers': matchedNumbers,
-          'purchase_date': currentDate.value.toString(),
-        };
-
-        // 임시로 결과 배열에 추가 (실제 저장은 하지 않음)
-        winningResults.add(testResult);
-
-        print(
-            '테스트 당첨 결과 추가: ${testNumbers.join(", ")}, 일치 번호: ${matchedNumbers.join(", ")}');
-      }
-
       // 당첨 결과를 등수별로 그룹화
       final Map<int, List<Map<String, dynamic>>> groupedResults = {};
 
@@ -433,8 +403,21 @@ class LottoTicketController extends GetxController {
       // 로또 결과 다이얼로그를 직접 호출
       Get.dialog(
         AlertDialog(
-          title: const Text('당첨 결과',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          title: Row(
+            children: [
+              const Text('당첨 결과',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 8),
+              Text(
+                '${currentRound.value}회차',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
           content: Container(
             width: double.maxFinite,
             constraints:
@@ -483,7 +466,7 @@ class LottoTicketController extends GetxController {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: Colors.black, // 빨간색 강조 제거
+                                color: Colors.black,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -495,14 +478,6 @@ class LottoTicketController extends GetxController {
                                       .containsKey('matched_numbers')
                                   ? List<int>.from(result['matched_numbers'])
                                   : <int>[];
-                              final purchaseDate =
-                                  result['purchase_date'] != null
-                                      ? DateTime.parse(
-                                          result['purchase_date'].toString())
-                                      : null;
-                              final purchaseDateStr = purchaseDate != null
-                                  ? '${purchaseDate.year}.${purchaseDate.month.toString().padLeft(2, '0')}.${purchaseDate.day.toString().padLeft(2, '0')}'
-                                  : '';
 
                               return Padding(
                                 padding: const EdgeInsets.only(
@@ -515,26 +490,8 @@ class LottoTicketController extends GetxController {
                                         Expanded(
                                           child: Text('${numbers.join(', ')}'),
                                         ),
-                                        if (purchaseDateStr.isNotEmpty)
-                                          Text(
-                                            purchaseDateStr,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
                                       ],
                                     ),
-                                    // 일치 번호 표시 주석 처리
-                                    // if (matchedNumbers.isNotEmpty)
-                                    //   Text(
-                                    //     '일치: ${matchedNumbers.join(', ')}',
-                                    //     style: TextStyle(
-                                    //       fontSize: 12,
-                                    //       color: Colors.green[800],
-                                    //       fontWeight: FontWeight.bold,
-                                    //     ),
-                                    //   ),
                                   ],
                                 ),
                               );
@@ -559,7 +516,7 @@ class LottoTicketController extends GetxController {
                     ),
                   ),
 
-                  // 이번 회차 당첨금액 정보 추가 - 직접 계산한 값 사용
+                  // 이번 회차 당첨금액 정보 추가
                   const SizedBox(height: 20),
                   Text(
                     '1등: ₩${_formatCurrency(calculatedPrizes[1] ?? 0)}',
@@ -660,6 +617,9 @@ class LottoTicketController extends GetxController {
     if (hasState) {
       await _loadGameState();
     } else {
+      // 초기 회차 설정 (첫 실행 시 1회차로 시작)
+      currentRound.value = 1;
+
       // 초기 티켓 생성
       addNewTicket();
 
@@ -699,6 +659,7 @@ class LottoTicketController extends GetxController {
         drawNumbers: drawNumbers.toList(),
         bonusNumber: bonusNumber.value,
         totalSpent: totalSpent.value,
+        currentRound: currentRound.value, // 회차 정보 저장
       );
     } catch (e) {
       print('게임 상태 저장 오류: $e');
@@ -718,7 +679,8 @@ class LottoTicketController extends GetxController {
         bonusNumber.value = state['bonus_number'] as int;
         totalSpent.value = state['total_spent'] as int;
 
-        print('게임 상태를 성공적으로 로드했습니다.');
+        // 회차 정보 로드 (없으면 기본값 1)
+        currentRound.value = state['current_round'] as int? ?? 1;
       }
     } catch (e) {
       print('게임 상태 로드 오류: $e');
@@ -731,12 +693,9 @@ class LottoTicketController extends GetxController {
       for (var ticket in tickets) {
         if (ticket.amount > 0) {
           // 금액이 있는 티켓만 저장 (선택된 번호가 있는 티켓)
-          print(
-              '저장할 티켓: ${ticket.lottoRows.map((row) => row.numbers).toList()}');
           await _dbService.savePurchasedTicket(currentDate.value, ticket);
         }
       }
-      print('티켓 저장 완료: ${tickets.length}장');
     } catch (e) {
       print('티켓 저장 오류: $e');
     }
@@ -913,126 +872,38 @@ class LottoTicketController extends GetxController {
     }
   }
 
-  // 현재 티켓에 대해 테스트 목적으로 당첨 결과 생성 (개발용)
-  Future<void> testWinningResultsGeneration() async {
-    print('===== 테스트 당첨 결과 생성 시작 =====');
+  // 게임 상태 초기화 (전체 리셋)
+  Future<void> resetAllGameData() async {
+    try {
+      // 데이터베이스 초기화
+      await _dbService.resetAllData();
 
-    // 추첨 번호가 없으면 생성
-    if (drawNumbers.isEmpty) {
-      final drawResult = await _drawService.drawLottoNumbers(currentDate.value);
-      drawNumbers.assignAll(List<int>.from(drawResult['draw_numbers']));
-      bonusNumber.value = drawResult['bonus_number'] as int;
+      // 메모리 변수 초기화
+      currentDate.value = DateTime.now();
+      seedMoney.value = 1000000;
+      tickets.clear();
+      addNewTicket(); // 기본 티켓 하나 추가
+
+      // 당첨 결과 관련 변수 초기화
+      winningResults.clear();
+      allWinningResults.clear();
+      isDrawDay.value = isCurrentDateDrawDay();
+      drawNumbers.clear();
+      bonusNumber.value = 0;
+      totalSpent.value = 0;
+
+      // 회차 초기화
+      currentRound.value = 1;
+
+      // 구매 완료 상태 초기화
+      purchaseCompleted.value = false;
+
+      // 게임 상태 저장
+      await _saveGameState();
+
+      print('모든 게임 데이터가 초기화되었습니다.');
+    } catch (e) {
+      print('게임 데이터 초기화 오류: $e');
     }
-
-    print('테스트용 추첨 번호: ${drawNumbers.join(", ")} + ${bonusNumber.value}');
-
-    // 현재 표시된 티켓에서 당첨 결과 생성
-    final List<Map<String, dynamic>> testResults = [];
-
-    // 각 티켓의 첫 번째 행을 테스트용으로 확인
-    for (int i = 0; i < tickets.length; i++) {
-      final ticket = tickets[i];
-      if (ticket.lottoRows.isNotEmpty) {
-        final row = ticket.lottoRows[0]; // 첫 번째 행
-        final numbers = row.numbers;
-
-        // 번호가 유효한지 확인
-        if (numbers.any((n) => n > 0)) {
-          print('티켓 #${i + 1} 번호: ${numbers.join(", ")}');
-
-          // 당첨 번호와 비교
-          int matchCount = 0;
-          bool hasBonus = false;
-          List<int> matchedNumbers = [];
-
-          for (var num in numbers) {
-            if (num > 0) {
-              // 유효한 번호만 확인
-              if (drawNumbers.contains(num)) {
-                matchCount++;
-                matchedNumbers.add(num);
-              }
-              if (num == bonusNumber.value) {
-                hasBonus = true;
-              }
-            }
-          }
-
-          print('일치 개수: $matchCount, 보너스: $hasBonus');
-
-          // 등수 결정
-          int rank = 0;
-          int prize = 0;
-
-          if (matchCount == 6) {
-            rank = 1;
-            prize = 2000000000; // 20억
-            print('1등 당첨!');
-          } else if (matchCount == 5 && hasBonus) {
-            rank = 2;
-            prize = 50000000; // 5천만원
-            print('2등 당첨!');
-          } else if (matchCount == 5) {
-            rank = 3;
-            prize = 1500000; // 150만원
-            print('3등 당첨!');
-          } else if (matchCount == 4) {
-            rank = 4;
-            prize = 50000; // 5만원
-            print('4등 당첨!');
-          } else if (matchCount == 3) {
-            rank = 5;
-            prize = 5000; // 5천원
-            print('5등 당첨!');
-          }
-
-          // 당첨된 경우 결과 추가
-          if (rank > 0) {
-            testResults.add({
-              'rank': rank,
-              'prize': prize,
-              'numbers': numbers,
-              'matched_numbers': matchedNumbers,
-              'purchase_date': currentDate.value.toString(),
-            });
-            print('당첨 추가: $rank등');
-          } else {
-            print('당첨 없음');
-          }
-        }
-      }
-    }
-
-    // 테스트 결과가 없으면 하나 임의로 생성
-    if (testResults.isEmpty) {
-      print('당첨 없음, 5등 테스트 결과 생성');
-      // 5등 (3개 일치) 생성
-      final testNumbers = [
-        drawNumbers[0],
-        drawNumbers[1],
-        drawNumbers[2],
-        41,
-        42,
-        43
-      ];
-
-      testResults.add({
-        'rank': 5,
-        'prize': 5000,
-        'numbers': testNumbers,
-        'matched_numbers': [drawNumbers[0], drawNumbers[1], drawNumbers[2]],
-        'purchase_date': currentDate.value.toString(),
-      });
-    }
-
-    // 당첨 결과 업데이트
-    winningResults.clear();
-    winningResults.assignAll(testResults);
-    print('총 ${testResults.length}개 테스트 당첨 결과 생성됨');
-
-    // 다이얼로그 표시
-    _showResultDialogWithNextDay();
-
-    print('===== 테스트 당첨 결과 생성 종료 =====');
   }
 }
