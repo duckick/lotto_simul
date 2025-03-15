@@ -253,6 +253,15 @@ class DatabaseService {
       where: 'is_checked = 0',
     );
 
+    // 디버그 로그 추가
+    print('미확인 티켓 총 ${maps.length}개 조회됨');
+
+    // 추첨일 이전 일요일 계산 (토요일로부터 6일 전)
+    final previousSunday =
+        DateTime(drawDate.year, drawDate.month, drawDate.day - 6);
+
+    print('현재 추첨일: $drawDate, 이전 일요일: $previousSunday');
+
     // Dart에서 추첨일이 일치하는 티켓만 필터링합니다
     final targetDrawDateStr = drawDate.toIso8601String();
     final filteredMaps = maps.where((ticketMap) {
@@ -260,6 +269,7 @@ class DatabaseService {
         final ticketData = jsonDecode(ticketMap['ticket_data'] as String);
         final ticketDrawDate = ticketData['drawDate'] as String;
         final ticketRound = ticketData['round'] as int;
+        final ticketIssueDate = DateTime.parse(ticketData['issueDate']);
 
         // 날짜가 동일한 날인지 확인 (시간은 무시하고 날짜만 비교)
         final isDateMatched =
@@ -269,13 +279,32 @@ class DatabaseService {
         final isRoundMatched =
             currentRound == null || ticketRound == currentRound;
 
-        return isDateMatched && isRoundMatched;
+        // 일요일에 구매한 티켓인지 확인
+        final isSundayTicket = ticketIssueDate.weekday == 7; // 7은 일요일
+
+        // 일요일 티켓이면서 이전 일요일에 구매한 것인지 확인
+        final isPreviousSundayTicket = isSundayTicket &&
+            ticketIssueDate.year == previousSunday.year &&
+            ticketIssueDate.month == previousSunday.month &&
+            ticketIssueDate.day == previousSunday.day;
+
+        // 일반 티켓이거나 이전 일요일 티켓이면서 회차가 맞으면 포함
+        final shouldInclude =
+            (isDateMatched || isPreviousSundayTicket) && isRoundMatched;
+
+        if (shouldInclude) {
+          print(
+              '티켓 포함: ID ${ticketMap['id']}, 발행일 ${ticketData['issueDate']}, 회차 $ticketRound');
+        }
+
+        return shouldInclude;
       } catch (e) {
         print('티켓 데이터 파싱 오류: $e');
         return false;
       }
     }).toList();
 
+    print('필터링 후 미확인 티켓 ${filteredMaps.length}개 남음');
     return filteredMaps;
   }
 
@@ -314,6 +343,15 @@ class DatabaseService {
     // 모든 티켓을 가져옵니다
     final List<Map<String, dynamic>> maps = await db.query('purchased_tickets');
 
+    // 디버그 로그 추가
+    print('전체 티켓 총 ${maps.length}개 조회됨');
+
+    // 추첨일 이전 일요일 계산 (토요일로부터 6일 전)
+    final previousSunday =
+        DateTime(drawDate.year, drawDate.month, drawDate.day - 6);
+
+    print('현재 추첨일: $drawDate, 이전 일요일: $previousSunday');
+
     // Dart에서 추첨일이 일치하는 티켓만 필터링합니다
     final targetDrawDateStr = drawDate.toIso8601String();
     final filteredMaps = maps.where((ticketMap) {
@@ -321,6 +359,7 @@ class DatabaseService {
         final ticketData = jsonDecode(ticketMap['ticket_data'] as String);
         final ticketDrawDate = ticketData['drawDate'] as String;
         final ticketRound = ticketData['round'] as int;
+        final ticketIssueDate = DateTime.parse(ticketData['issueDate']);
 
         // 날짜가 동일한 날인지 확인 (시간은 무시하고 날짜만 비교)
         final isDateMatched =
@@ -330,13 +369,32 @@ class DatabaseService {
         final isRoundMatched =
             currentRound == null || ticketRound == currentRound;
 
-        return isDateMatched && isRoundMatched;
+        // 일요일에 구매한 티켓인지 확인
+        final isSundayTicket = ticketIssueDate.weekday == 7; // 7은 일요일
+
+        // 일요일 티켓이면서 이전 일요일에 구매한 것인지 확인
+        final isPreviousSundayTicket = isSundayTicket &&
+            ticketIssueDate.year == previousSunday.year &&
+            ticketIssueDate.month == previousSunday.month &&
+            ticketIssueDate.day == previousSunday.day;
+
+        // 일반 티켓이거나 이전 일요일 티켓이면서 회차가 맞으면 포함
+        final shouldInclude =
+            (isDateMatched || isPreviousSundayTicket) && isRoundMatched;
+
+        if (shouldInclude) {
+          print(
+              '티켓 포함: ID ${ticketMap['id']}, 발행일 ${ticketData['issueDate']}, 회차 $ticketRound');
+        }
+
+        return shouldInclude;
       } catch (e) {
         print('티켓 데이터 파싱 오류: $e');
         return false;
       }
     }).toList();
 
+    print('필터링 후 티켓 ${filteredMaps.length}개 남음');
     return filteredMaps;
   }
 

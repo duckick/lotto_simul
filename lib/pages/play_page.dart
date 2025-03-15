@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import 'package:animations/animations.dart';
+import 'package:animated_flip_counter/animated_flip_counter.dart';
 import '../controllers/lotto_ticket_controller.dart';
 import '../widgets/mini_lotto_ticket_widget.dart';
 
@@ -448,9 +449,11 @@ class _PlayPageState extends State<PlayPage>
                             ),
                             const SizedBox(width: 8),
                             // 보유금액
-                            Obx(() => Text(
-                                  '₩${NumberFormat('#,###').format(controller.seedMoney.value)}',
-                                  style: const TextStyle(
+                            Obx(() => AnimatedFlipCounter(
+                                  value: controller.seedMoney.value,
+                                  prefix: '₩',
+                                  thousandSeparator: ',',
+                                  textStyle: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.blue,

@@ -138,9 +138,19 @@ class LottoDrawService {
 
     final results = <Map<String, dynamic>>[];
 
+    // 이미 처리한 티켓 ID를 추적하기 위한 Set
+    final processedTicketIds = <int>{};
+
     // 데이터베이스에서 가져온 티켓 처리
     for (var ticketMap in uncheckedTickets) {
       final ticketId = ticketMap['id'] as int;
+
+      // 이미 처리한 티켓은 건너뜀
+      if (processedTicketIds.contains(ticketId)) {
+        print('이미 처리된 티켓 ID: $ticketId - 건너뜀');
+        continue;
+      }
+
       final ticketData = ticketMap['ticket_data'];
 
       // 티켓 데이터 파싱
@@ -148,6 +158,12 @@ class LottoDrawService {
 
       print(
           '티켓 확인 (DB) - ID: $ticketId, 회차: ${ticket.round}, 추첨일: ${ticket.drawDate}');
+
+      // 회차 확인 - 현재 회차와 일치하는지 확인
+      if (currentRound != null && ticket.round != currentRound) {
+        print('회차 불일치: 티켓 회차 ${ticket.round}, 현재 회차 $currentRound - 건너뜀');
+        continue;
+      }
 
       // 각 로또 행에 대해 당첨 여부 확인
       for (var row in ticket.lottoRows) {
@@ -163,6 +179,7 @@ class LottoDrawService {
               'numbers': row.numbers,
               'rank': rank,
               'prize': _getPrizeAmount(rank),
+              'round': ticket.round, // 회차 정보 추가
             });
           }
         }
@@ -170,6 +187,9 @@ class LottoDrawService {
 
       // 티켓을 확인했음으로 표시
       await _dbService.updateTicketCheckedStatus(ticketId, true);
+
+      // 처리한 티켓 ID 추가
+      processedTicketIds.add(ticketId);
     }
 
     // 메모리에서 방금 구매한 티켓도 당첨 확인에 포함
@@ -178,6 +198,12 @@ class LottoDrawService {
 
       for (var ticket in includeTickets) {
         print('티켓 확인 (메모리) - 회차: ${ticket.round}, 추첨일: ${ticket.drawDate}');
+
+        // 회차 확인 - 현재 회차와 일치하는지 확인
+        if (currentRound != null && ticket.round != currentRound) {
+          print('회차 불일치: 티켓 회차 ${ticket.round}, 현재 회차 $currentRound - 건너뜀');
+          continue;
+        }
 
         // 각 로또 행에 대해 당첨 여부 확인
         for (var row in ticket.lottoRows) {
@@ -194,6 +220,7 @@ class LottoDrawService {
                 'numbers': row.numbers,
                 'rank': rank,
                 'prize': _getPrizeAmount(rank),
+                'round': ticket.round, // 회차 정보 추가
               });
             }
           }
@@ -209,14 +236,15 @@ class LottoDrawService {
   // 모든 당첨 결과 가져오기
   Future<List<Map<String, dynamic>>> getAllWinningResults() async {
     try {
-      // 데이터베이스에서 모든 당첨 결과를 가져오는 로직
-      // 실제 구현에서는 데이터베이스에 당첨 결과를 저장하는 테이블이 필요합니다.
-      // 현재는 임시로 빈 리스트를 반환합니다.
-
       // 모든 추첨 결과 가져오기
       final allDrawResults = await _dbService.getAllDrawResults();
-
       final allResults = <Map<String, dynamic>>[];
+
+      // 이미 처리한 티켓 ID와 행 이름 조합을 추적하기 위한 Set
+      final processedKeys = <String>{};
+
+      print('==== 모든 당첨 결과 조회 시작 ====');
+      print('추첨 결과 수: ${allDrawResults.length}');
 
       // 각 추첨 결과에 대해 당첨된 티켓 확인
       for (var drawResult in allDrawResults) {
@@ -224,20 +252,21 @@ class LottoDrawService {
         final drawNumbers = List<int>.from(drawResult['draw_numbers']);
         final bonusNumber = drawResult['bonus_number'] as int;
 
+        print('추첨일: $drawDate, 번호: $drawNumbers, 보너스: $bonusNumber');
+
         // 현재 회차의 당첨금 정보 설정
         if (drawResult.containsKey('prizes')) {
           _currentRoundPrizes = Map<int, int>.from(drawResult['prizes'] as Map);
         } else {
           // 기존 데이터에 당첨금 정보가 없는 경우 새로 계산
           _currentRoundPrizes = _prizeCalculator.calculatePrizes();
-          // 당첨금 정보 로그 출력
-          _logPrizeAmounts(drawDate);
         }
 
-        // 이 추첨일에 해당하는 모든 회차의 티켓 확인을 위해 currentRound를 null로 설정
-        // 이는 데이터베이스에서 회차 정보를 추출하지 않았기 때문입니다
+        // 이 추첨일에 해당하는 모든 티켓 조회 (확인 여부 상관없이)
         final tickets = await _dbService.getAllTicketsForDrawDate(drawDate);
+        print('추첨일 ${drawDate}에 대한 티켓 수: ${tickets.length}');
 
+        // 각 티켓에 대해 당첨 여부 확인
         for (var ticketMap in tickets) {
           final ticketId = ticketMap['id'] as int;
           final ticketData = ticketMap['ticket_data'];
@@ -249,10 +278,20 @@ class LottoDrawService {
           for (var row in ticket.lottoRows) {
             // 선택된 번호가 있는 경우에만 확인
             if (row.numbers.any((num) => num > 0)) {
+              // 중복 확인을 위한 키 생성
+              final key = '$ticketId-${row.rowName}';
+
+              // 이미 처리한 티켓+행 조합이면 건너뜀
+              if (processedKeys.contains(key)) {
+                print('중복 티켓 건너뜀: $key');
+                continue;
+              }
+
               final rank =
                   checkWinningRank(row.numbers, drawNumbers, bonusNumber);
 
               if (rank > 0) {
+                print('당첨 발견: 티켓 ID $ticketId, 행 ${row.rowName}, 등수 $rank');
                 allResults.add({
                   'ticket_id': ticketId,
                   'row_name': row.rowName,
@@ -260,13 +299,19 @@ class LottoDrawService {
                   'rank': rank,
                   'prize': _getPrizeAmount(rank),
                   'draw_date': drawDate,
-                  'round': ticket.round, // round 정보 추가
+                  'round': ticket.round,
                 });
+
+                // 처리한 티켓+행 조합 기록
+                processedKeys.add(key);
               }
             }
           }
         }
       }
+
+      print('총 당첨 결과: ${allResults.length}개');
+      print('==== 모든 당첨 결과 조회 완료 ====');
 
       return allResults;
     } catch (e) {

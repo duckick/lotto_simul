@@ -36,6 +36,12 @@ class LottoTicketController extends GetxController {
   // 버튼 비활성화 상태 관리 변수
   final isButtonDisabled = false.obs;
 
+  // 번호 공개 카운터 (0: 모두 비공개, 7: 모두 공개)
+  final _revealedNumberCount = 0.obs;
+
+  // 당첨금 임시 저장 변수 추가
+  int _pendingWinnings = 0;
+
   // 버튼 비활성화 처리 함수
   void _disableButtonTemporarily() {
     isButtonDisabled.value = true;
@@ -240,13 +246,20 @@ class LottoTicketController extends GetxController {
             }
           }
 
+          // 회차 정보 가져오기 (결과에 포함되어 있지 않으면 현재 회차 사용)
+          final resultRound = result.containsKey('round')
+              ? result['round'] as int
+              : currentRound.value;
+
           winningResults.add({
             'rank': result['rank'],
             'prize': result['prize'],
             'numbers': result['numbers'],
             'matched_numbers': matchedNumbers,
             'purchase_date': currentDate.value.toString(),
-            'round': currentRound.value, // 회차 정보 추가
+            'round': resultRound, // 회차 정보 추가
+            'ticket_id': result['ticket_id'], // 티켓 ID 추가
+            'row_name': result['row_name'], // 행 이름 추가
           });
         }
 
@@ -256,18 +269,83 @@ class LottoTicketController extends GetxController {
           totalWinnings += result['prize'] as int;
         }
 
-        // 잔액에 당첨금 추가
-        seedMoney.value += totalWinnings;
+        // 당첨금을 임시 변수에 저장하고, 즉시 반영하지 않음
+        _pendingWinnings = totalWinnings;
 
         // 디버그 로그 추가
-        print('당첨결과: ${winningResults.length}개, 총 당첨금: ${totalWinnings}원');
+        print(
+            '당첨결과: ${winningResults.length}개, 총 당첨금: ${totalWinnings}원 (추첨 후 반영 예정)');
       } else {
+        _pendingWinnings = 0;
         print('당첨된 티켓이 없습니다.');
       }
       print('===========================================================');
 
       // 결과 팝업 표시
       shouldShowResult.value = true;
+
+      // 게임 상태 저장 (당첨 결과 포함)
+      await _saveGameState();
+
+      // 당첨 결과를 데이터베이스에 저장
+      if (winningResults.isNotEmpty) {
+        await _savePurchasedTickets(); // 티켓 저장 확인
+
+        // 티켓 확인 상태 업데이트
+        for (var result in winningResults) {
+          if (result.containsKey('ticket_id')) {
+            final ticketId = result['ticket_id'] as int;
+            if (ticketId > 0) {
+              // 메모리 티켓이 아닌 경우만
+              await _dbService.updateTicketCheckedStatus(ticketId, true);
+            }
+          }
+        }
+      }
+
+      // 모든 당첨 결과 다시 로드하여 통계에 반영
+      await loadAllWinningResults();
+
+      // 토요일에 시작하여 같은 날 구매 및 당첨이 이루어질 경우에도 통계에 반영
+      // 현재 당첨 결과를 allWinningResults에 직접 추가
+      if (winningResults.isNotEmpty) {
+        // 이미 통계에 있는 결과의 키를 추출
+        final existingKeys = <String>{};
+        for (var result in allWinningResults) {
+          final ticketId = result['ticket_id'] as int;
+          final rowName = result['row_name'] as String;
+          existingKeys.add('$ticketId-$rowName');
+        }
+
+        // 현재 당첨 결과 중 아직 통계에 없는 것만 추가
+        for (var result in winningResults) {
+          final ticketId =
+              result.containsKey('ticket_id') ? result['ticket_id'] as int : -1;
+          final rowName = result.containsKey('row_name')
+              ? result['row_name'] as String
+              : '';
+          final key = '$ticketId-$rowName';
+
+          if (!existingKeys.contains(key)) {
+            // 통계에 필요한 추가 정보 포함
+            final statResult = {
+              'ticket_id': ticketId,
+              'row_name': rowName,
+              'numbers': List<int>.from(result['numbers']),
+              'rank': result['rank'],
+              'prize': result['prize'],
+              'draw_date': currentDate.value,
+              'round': result['round'],
+            };
+
+            allWinningResults.add(statResult);
+            print(
+                '통계에 당첨 결과 직접 추가: 티켓 ID $ticketId, 행 $rowName, 등수 ${result['rank']}');
+          } else {
+            print('이미 통계에 있는 결과 건너뜀: 티켓 ID $ticketId, 행 $rowName');
+          }
+        }
+      }
     } catch (e) {
       print('당첨 번호 확인 오류: $e');
     }
@@ -392,6 +470,9 @@ class LottoTicketController extends GetxController {
       // 당첨 결과 확인
       await checkDrawResults(includeTickets: purchasedTickets);
 
+      // 게임 상태 저장 (당첨 결과 포함)
+      await _saveGameState();
+
       // 결과 다이얼로그를 표시하고 닫기 버튼을 누르면 다음날로 이동
       _showResultDialogWithNextDay();
     } else {
@@ -467,114 +548,175 @@ class LottoTicketController extends GetxController {
                   const Text('이번 회차 당첨 번호',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ...drawNumbers
-                          .map((number) => _buildLottoBall(number, false)),
-                      const Text(' + ', style: TextStyle(fontSize: 16)),
-                      _buildLottoBall(bonusNumber.value, true),
-                    ],
-                  ),
+
+                  // 번호 공개 애니메이션을 위한 Obx 위젯
+                  Obx(() {
+                    // 현재 공개된 번호 수를 추적하는 변수
+                    final revealedCount = _revealedNumberCount.value;
+
+                    return Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // 6개의 일반 번호
+                            ...List.generate(6, (index) {
+                              // 아직 공개되지 않은 번호는 물음표로 표시
+                              final isRevealed = index < revealedCount;
+                              return _buildLottoBall(
+                                isRevealed ? drawNumbers[index] : 0,
+                                false,
+                                isRevealed: isRevealed,
+                              );
+                            }),
+                            const Text(' + ', style: TextStyle(fontSize: 16)),
+                            // 보너스 번호 (마지막에 공개)
+                            _buildLottoBall(
+                              revealedCount > 6 ? bonusNumber.value : 0,
+                              true,
+                              isRevealed: revealedCount > 6,
+                            ),
+                          ],
+                        ),
+
+                        // 번호 공개 중 메시지 표시
+                        if (revealedCount <= 7)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0),
+                            child: Text(
+                              revealedCount == 0
+                                  ? '추첨을 시작합니다...'
+                                  : revealedCount <= 6
+                                      ? '${revealedCount}번째 번호 추첨 중...'
+                                      : '보너스 번호 추첨 중...',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  }),
+
                   const SizedBox(height: 16),
                   const Divider(),
 
-                  // 당첨 결과 표시
-                  if (winningResults.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(child: Text('당첨된 번호가 없습니다.')),
-                    )
-                  else
-                    ...sortedRanks.map((rank) {
-                      final resultsForRank = groupedResults[rank]!;
-                      final totalPrizeForRank = resultsForRank.fold<int>(
-                          0, (sum, result) => sum + (result['prize'] as int));
+                  // 당첨 결과 표시 (모든 번호가 공개된 후에만 표시)
+                  Obx(() {
+                    final isAllRevealed = _revealedNumberCount.value > 7;
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 등수와 총 당첨금 표시
-                            Text(
-                              '$rank등: ${resultsForRank.length}개 - ₩${totalPrizeForRank.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
+                    if (!isAllRevealed) {
+                      return const SizedBox.shrink(); // 모든 번호가 공개되기 전에는 빈 위젯 반환
+                    }
 
-                            // 각 당첨 번호와 구매 날짜 표시
-                            ...resultsForRank.map((result) {
-                              final numbers = List<int>.from(result['numbers']);
-                              final matchedNumbers = result
-                                      .containsKey('matched_numbers')
-                                  ? List<int>.from(result['matched_numbers'])
-                                  : <int>[];
+                    if (winningResults.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Center(child: Text('당첨된 번호가 없습니다.')),
+                      );
+                    }
 
-                              return Padding(
-                                padding: const EdgeInsets.only(
-                                    bottom: 4.0, left: 8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ...sortedRanks.map((rank) {
+                          final resultsForRank = groupedResults[rank]!;
+                          final totalPrizeForRank = resultsForRank.fold<int>(0,
+                              (sum, result) => sum + (result['prize'] as int));
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 등수와 총 당첨금 표시
+                                Text(
+                                  '$rank등: ${resultsForRank.length}개 - ₩${totalPrizeForRank.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+
+                                // 각 당첨 번호와 구매 날짜 표시
+                                ...resultsForRank.map((result) {
+                                  final numbers =
+                                      List<int>.from(result['numbers']);
+                                  final matchedNumbers =
+                                      result.containsKey('matched_numbers')
+                                          ? List<int>.from(
+                                              result['matched_numbers'])
+                                          : <int>[];
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                        bottom: 4.0, left: 8.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Expanded(
-                                          child: Text('${numbers.join(', ')}'),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child:
+                                                  Text('${numbers.join(', ')}'),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            const Divider(),
-                          ],
+                                  );
+                                }).toList(),
+                                const Divider(),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+
+                        // 이번 회차 구매한 티켓 수 표시
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            '이번 회차 구매한 로또: ${ticketCount}장',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
                         ),
-                      );
-                    }).toList(),
 
-                  // 이번 회차 구매한 티켓 수 표시
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.center,
-                    child: Text(
-                      '이번 회차 구매한 로또: ${ticketCount}장',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-
-                  // 이번 회차 당첨금액 정보 추가
-                  const SizedBox(height: 20),
-                  Text(
-                    '1등: ₩${_formatCurrency(calculatedPrizes[1] ?? 0)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  Text(
-                    '2등: ₩${_formatCurrency(calculatedPrizes[2] ?? 0)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  Text(
-                    '3등: ₩${_formatCurrency(calculatedPrizes[3] ?? 0)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
+                        // 이번 회차 당첨금액 정보 추가
+                        const SizedBox(height: 20),
+                        Text(
+                          '1등: ₩${_formatCurrency(calculatedPrizes[1] ?? 0)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          '2등: ₩${_formatCurrency(calculatedPrizes[2] ?? 0)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          '3등: ₩${_formatCurrency(calculatedPrizes[3] ?? 0)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
                 ],
               ),
             ),
@@ -582,6 +724,8 @@ class LottoTicketController extends GetxController {
           actions: [
             TextButton(
               onPressed: () {
+                // 번호 공개 카운터 초기화
+                _revealedNumberCount.value = 0;
                 Get.back(); // 다이얼로그 닫기
                 // 다이얼로그를 닫은 후 다음 날로 이동
                 actuallyMoveToNextDay();
@@ -592,18 +736,71 @@ class LottoTicketController extends GetxController {
         ),
         barrierDismissible: false, // 바깥쪽 터치로 닫히지 않도록 설정
       );
+
+      // 번호 공개 애니메이션 시작
+      _startNumberRevealAnimation();
     });
   }
 
-  // 숫자를 통화 형식으로 포맷팅 (1000000 -> 1,000,000)
-  String _formatCurrency(int value) {
-    return value.toString().replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
+  // 번호 공개 애니메이션 시작
+  void _startNumberRevealAnimation() {
+    // 카운터 초기화
+    _revealedNumberCount.value = 0;
+
+    // 각 번호를 순차적으로 공개
+    for (int i = 1; i <= 7; i++) {
+      Future.delayed(Duration(milliseconds: 800 * i), () {
+        if (Get.isDialogOpen ?? false) {
+          // 다이얼로그가 열려있는 경우에만 업데이트
+          _revealedNumberCount.value = i;
+
+          // 모든 번호가 공개된 후 당첨금 반영
+          if (i == 7) {
+            // 마지막 번호 공개 후 약간의 지연시간을 두고 당첨금 반영
+            Future.delayed(const Duration(milliseconds: 800), () {
+              if (Get.isDialogOpen ?? false) {
+                // 당첨금 반영
+                seedMoney.value += _pendingWinnings;
+                print('당첨금 ${_pendingWinnings}원이 보유금액에 반영되었습니다.');
+
+                // 당첨 결과 표시를 위해 카운터 증가
+                _revealedNumberCount.value = 8;
+              }
+            });
+          }
+        }
+      });
+    }
   }
 
   // 로또 볼 위젯
-  Widget _buildLottoBall(int number, bool isBonus, {double size = 24.0}) {
+  Widget _buildLottoBall(int number, bool isBonus,
+      {double size = 24.0, bool isRevealed = true}) {
     Color ballColor;
+
+    if (!isRevealed) {
+      // 아직 공개되지 않은 번호는 회색으로 표시
+      return Container(
+        width: size,
+        height: size,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          shape: BoxShape.circle,
+          border: isBonus ? Border.all(color: Colors.red, width: 2) : null,
+        ),
+        child: Center(
+          child: Text(
+            '?',
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.bold,
+              fontSize: size * 0.5,
+            ),
+          ),
+        ),
+      );
+    }
 
     if (number <= 10) {
       ballColor = Colors.yellow.shade600;
@@ -637,6 +834,12 @@ class LottoTicketController extends GetxController {
         ),
       ),
     );
+  }
+
+  // 숫자를 통화 형식으로 포맷팅 (1000000 -> 1,000,000)
+  String _formatCurrency(int value) {
+    return value.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
   }
 
   // 통계 화면으로 이동
@@ -673,6 +876,56 @@ class LottoTicketController extends GetxController {
 
     // 이전 당첨 결과 로드
     await loadAllWinningResults();
+
+    // 토요일에 시작한 경우 당첨 결과가 통계에 반영되었는지 확인
+    if (isDrawDay.value && winningResults.isNotEmpty) {
+      print('토요일 시작 - 당첨 결과 통계 반영 확인');
+
+      // 현재 당첨 결과가 통계에 반영되었는지 확인
+      final missingResults = <Map<String, dynamic>>[];
+
+      for (var result in winningResults) {
+        final ticketId =
+            result.containsKey('ticket_id') ? result['ticket_id'] as int : -1;
+        final rowName =
+            result.containsKey('row_name') ? result['row_name'] as String : '';
+        final key = '$ticketId-$rowName';
+
+        // 통계에 이 결과가 있는지 확인
+        final isInStats = allWinningResults.any((statResult) {
+          if (statResult.containsKey('ticket_id') &&
+              statResult.containsKey('row_name')) {
+            final statTicketId = statResult['ticket_id'] as int;
+            final statRowName = statResult['row_name'] as String;
+            return '$statTicketId-$statRowName' == key;
+          }
+          return false;
+        });
+
+        if (!isInStats) {
+          // 통계에 필요한 추가 정보 포함
+          final statResult = {
+            'ticket_id': ticketId,
+            'row_name': rowName,
+            'numbers': List<int>.from(result['numbers']),
+            'rank': result['rank'],
+            'prize': result['prize'],
+            'draw_date': currentDate.value,
+            'round': result['round'],
+          };
+
+          missingResults.add(statResult);
+          print(
+              '통계에 누락된 결과 발견: 티켓 ID $ticketId, 행 $rowName, 등수 ${result['rank']}');
+        }
+      }
+
+      // 누락된 결과가 있으면 통계에 추가
+      if (missingResults.isNotEmpty) {
+        print('누락된 결과 ${missingResults.length}개를 통계에 추가');
+        allWinningResults.addAll(missingResults);
+      }
+    }
 
     // 게임 상태 변경 시 저장하도록 리스너 설정
     ever(currentDate, (_) => _saveGameState());
@@ -740,8 +993,63 @@ class LottoTicketController extends GetxController {
   // 모든 당첨 결과 로드
   Future<void> loadAllWinningResults() async {
     try {
+      print('==== 당첨 통계 로드 시작 ====');
+
+      // 기존 통계 결과 백업
+      final currentResults = List<Map<String, dynamic>>.from(allWinningResults);
+
+      // 서비스에서 모든 당첨 결과 가져오기
       final results = await _drawService.getAllWinningResults();
-      allWinningResults.assignAll(results);
+      print('서비스에서 가져온 당첨 결과: ${results.length}개');
+
+      // 중복 제거를 위해 티켓 ID와 행 이름으로 고유 식별
+      final uniqueResults = <Map<String, dynamic>>[];
+      final processedKeys = <String>{};
+
+      // 먼저 기존 결과 처리 (메모리에 있는 결과 우선)
+      for (var result in currentResults) {
+        if (result.containsKey('ticket_id') && result.containsKey('row_name')) {
+          final ticketId = result['ticket_id'] as int;
+          final rowName = result['row_name'] as String;
+          final key = '$ticketId-$rowName';
+
+          if (!processedKeys.contains(key)) {
+            uniqueResults.add(result);
+            processedKeys.add(key);
+            print('기존 결과 유지: 티켓 ID $ticketId, 행 $rowName');
+          }
+        }
+      }
+
+      // 서비스에서 가져온 결과 처리
+      for (var result in results) {
+        final ticketId = result['ticket_id'] as int;
+        final rowName = result['row_name'] as String;
+        final key = '$ticketId-$rowName';
+
+        if (!processedKeys.contains(key)) {
+          uniqueResults.add(result);
+          processedKeys.add(key);
+          print('새 결과 추가: 티켓 ID $ticketId, 행 $rowName, 등수 ${result['rank']}');
+        } else {
+          print('중복 당첨 결과 제외: 티켓 ID $ticketId, 행 $rowName');
+        }
+      }
+
+      print('총 당첨 결과: ${results.length}개, 중복 제거 후: ${uniqueResults.length}개');
+
+      // 결과 할당 전에 기존 결과와 비교
+      final isDifferent = uniqueResults.length != allWinningResults.length;
+
+      if (isDifferent) {
+        print(
+            '당첨 통계 업데이트: ${allWinningResults.length}개 -> ${uniqueResults.length}개');
+        allWinningResults.assignAll(uniqueResults);
+      } else {
+        print('당첨 통계 변경 없음');
+      }
+
+      print('==== 당첨 통계 로드 완료 ====');
     } catch (e) {
       print('당첨 결과 로드 오류: $e');
     }
